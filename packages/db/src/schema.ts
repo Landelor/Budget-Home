@@ -85,6 +85,16 @@ export const budgets = pgTable("budgets", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const refreshTokens = pgTable("refresh_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Relations — used by Drizzle's relational query API
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -92,6 +102,11 @@ export const usersRelations = relations(users, ({ many }) => ({
   transactions: many(transactions),
   budgets: many(budgets),
   categories: many(categories),
+  refreshTokens: many(refreshTokens),
+}));
+
+export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
+  user: one(users, { fields: [refreshTokens.userId], references: [users.id] }),
 }));
 
 export const categoriesRelations = relations(categories, ({ one, many }) => ({
@@ -150,3 +165,6 @@ export type NewTransaction = typeof transactions.$inferInsert;
 
 export type Budget = typeof budgets.$inferSelect;
 export type NewBudget = typeof budgets.$inferInsert;
+
+export type RefreshToken = typeof refreshTokens.$inferSelect;
+export type NewRefreshToken = typeof refreshTokens.$inferInsert;
