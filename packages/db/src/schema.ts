@@ -51,6 +51,7 @@ export const accounts = pgTable("accounts", {
     .notNull()
     .default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const transactions = pgTable("transactions", {
@@ -69,6 +70,7 @@ export const transactions = pgTable("transactions", {
   }),
   isRecurring: boolean("is_recurring").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const budgets = pgTable("budgets", {
@@ -83,6 +85,7 @@ export const budgets = pgTable("budgets", {
   limitAmount: numeric("limit_amount", { precision: 12, scale: 2 }).notNull(),
   startDate: date("start_date").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const refreshTokens = pgTable("refresh_tokens", {

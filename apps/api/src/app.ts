@@ -4,6 +4,10 @@ import rateLimit from "@fastify/rate-limit";
 import { healthRoutes } from "./routes/health.js";
 import { helloRoutes } from "./routes/hello.js";
 import { authRoutes } from "./routes/auth.js";
+import { accountRoutes } from "./routes/accounts.js";
+import { transactionRoutes } from "./routes/transactions.js";
+import { categoryRoutes } from "./routes/categories.js";
+import { budgetRoutes } from "./routes/budgets.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -23,6 +27,10 @@ export async function buildApp() {
   await app.register(healthRoutes);
   await app.register(helloRoutes);
   await app.register(authRoutes);
+  await app.register(accountRoutes);
+  await app.register(transactionRoutes);
+  await app.register(categoryRoutes);
+  await app.register(budgetRoutes);
 
   return app;
 }
