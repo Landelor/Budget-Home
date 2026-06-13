@@ -14,7 +14,8 @@
     "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "drizzle-orm": "^0.32.2"
   },
   "engines": {
     "node": ">=20"
