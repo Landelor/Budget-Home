@@ -31,8 +31,8 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           and(
             eq(transactions.userId, userId),
             isNull(transactions.deletedAt),
-            sql`${transactions.date} >= date_trunc('month', CURRENT_DATE)::text`,
-            sql`${transactions.date} <= CURRENT_DATE::text`,
+            sql`${transactions.date} >= date_trunc('month', CURRENT_DATE)`,
+            sql`${transactions.date} <= CURRENT_DATE`,
           ),
         );
 
