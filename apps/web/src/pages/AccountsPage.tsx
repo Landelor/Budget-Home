@@ -55,6 +55,13 @@ export function AccountsPage({ onLogout, onNavigate }: Props) {
             <button
               style={styles.navBtn}
               type="button"
+              onClick={() => onNavigate("dashboard")}
+            >
+              Dashboard
+            </button>
+            <button
+              style={styles.navBtn}
+              type="button"
               onClick={() => onNavigate("transactions")}
             >
               Transactions

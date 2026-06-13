@@ -14,7 +14,7 @@ import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 
 interface Props {
   onLogout: () => void;
-  onNavigate: (page: "accounts") => void;
+  onNavigate: (page: string) => void;
 }
 
 function formatAmount(amountStr: string): { display: string; positive: boolean } {
@@ -147,6 +147,13 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
       <header style={styles.header}>
         <h1 style={styles.heading}>BudgetApp</h1>
         <nav style={styles.nav}>
+          <button
+            style={styles.navBtn}
+            type="button"
+            onClick={() => onNavigate("dashboard")}
+          >
+            Dashboard
+          </button>
           <button style={{ ...styles.navBtn, ...styles.navBtnActive }} type="button">
             Transactions
           </button>

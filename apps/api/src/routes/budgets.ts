@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { db, budgets, transactions } from "@budgetapp/db";
-import { eq, and, isNull, gte, sql } from "drizzle-orm";
+import { db, budgets, transactions, categories } from "@budgetapp/db";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { authenticate } from "../middleware/authenticate.js";
 
 type BudgetPeriod = "monthly" | "weekly";
@@ -17,24 +17,33 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           id: budgets.id,
           userId: budgets.userId,
           categoryId: budgets.categoryId,
+          categoryName: categories.name,
+          categoryColor: categories.color,
+          categoryIcon: categories.icon,
           period: budgets.period,
           limitAmount: budgets.limitAmount,
           startDate: budgets.startDate,
           createdAt: budgets.createdAt,
-          currentSpend: sql<string>`COALESCE(SUM(${transactions.amount}::numeric), 0)::text`,
+          currentSpend: sql<string>`COALESCE(SUM(
+            CASE WHEN ${transactions.amount}::numeric < 0
+              THEN -${transactions.amount}::numeric
+              ELSE 0
+            END
+          ), 0)::text`,
         })
         .from(budgets)
+        .innerJoin(categories, eq(categories.id, budgets.categoryId))
         .leftJoin(
           transactions,
           and(
             eq(transactions.categoryId, budgets.categoryId),
             eq(transactions.userId, userId),
             isNull(transactions.deletedAt),
-            gte(transactions.date, budgets.startDate),
-            sql`${transactions.date} < CASE
-              WHEN ${budgets.period} = 'monthly' THEN (${budgets.startDate}::date + INTERVAL '1 month')::text
-              ELSE (${budgets.startDate}::date + INTERVAL '7 days')::text
+            sql`${transactions.date} >= CASE
+              WHEN ${budgets.period} = 'monthly' THEN date_trunc('month', CURRENT_DATE)::text
+              ELSE date_trunc('week', CURRENT_DATE)::text
             END`,
+            sql`${transactions.date} <= CURRENT_DATE::text`,
           ),
         )
         .where(and(eq(budgets.userId, userId), isNull(budgets.deletedAt)))
@@ -42,6 +51,9 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
           budgets.id,
           budgets.userId,
           budgets.categoryId,
+          categories.name,
+          categories.color,
+          categories.icon,
           budgets.period,
           budgets.limitAmount,
           budgets.startDate,

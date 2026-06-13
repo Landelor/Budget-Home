@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useAuth } from "./hooks/useAuth.js";
 import { AuthPage } from "./pages/AuthPage.js";
+import { DashboardPage } from "./pages/DashboardPage.js";
 import { AccountsPage } from "./pages/AccountsPage.js";
 import { TransactionsPage } from "./pages/TransactionsPage.js";
 
-type Page = "transactions" | "accounts";
+type Page = "dashboard" | "transactions" | "accounts";
 
 export function App() {
   const { isAuthenticated, loading, error, login, register, logout } = useAuth();
-  const [page, setPage] = useState<Page>("transactions");
+  const [page, setPage] = useState<Page>("dashboard");
 
   if (!isAuthenticated) {
     return (
@@ -30,5 +31,19 @@ export function App() {
     );
   }
 
-  return <TransactionsPage onLogout={logout} onNavigate={(p) => setPage(p)} />;
+  if (page === "transactions") {
+    return (
+      <TransactionsPage
+        onLogout={logout}
+        onNavigate={(p) => setPage(p as Page)}
+      />
+    );
+  }
+
+  return (
+    <DashboardPage
+      onLogout={logout}
+      onNavigate={(p) => setPage(p as Page)}
+    />
+  );
 }
