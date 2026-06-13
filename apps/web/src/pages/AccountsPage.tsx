@@ -20,9 +20,10 @@ const TYPE_COLORS: Record<AccountType, string> = {
 
 interface Props {
   onLogout: () => void;
+  onNavigate?: (page: string) => void;
 }
 
-export function AccountsPage({ onLogout }: Props) {
+export function AccountsPage({ onLogout, onNavigate }: Props) {
   const { accounts, loading, error, add, edit, remove } = useAccounts();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Account | null>(null);
@@ -49,6 +50,23 @@ export function AccountsPage({ onLogout }: Props) {
     <div style={styles.page}>
       <header style={styles.header}>
         <h1 style={styles.heading}>BudgetApp</h1>
+        {onNavigate && (
+          <nav style={{ display: "flex", gap: "0.25rem", flex: 1 }}>
+            <button
+              style={styles.navBtn}
+              type="button"
+              onClick={() => onNavigate("transactions")}
+            >
+              Transactions
+            </button>
+            <button
+              style={{ ...styles.navBtn, background: "rgba(255,255,255,0.12)", color: "#fff" }}
+              type="button"
+            >
+              Accounts
+            </button>
+          </nav>
+        )}
         <button onClick={onLogout} style={styles.logoutBtn} type="button">
           Sign out
         </button>
@@ -158,15 +176,25 @@ const styles: Record<string, React.CSSProperties> = {
   header: {
     background: "#1a1a2e",
     color: "#fff",
-    padding: "1rem 2rem",
+    padding: "0.75rem 2rem",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: "1.5rem",
   },
   heading: {
     margin: 0,
     fontSize: "1.25rem",
     fontWeight: 700,
+  },
+  navBtn: {
+    background: "transparent",
+    border: "none",
+    color: "rgba(255,255,255,0.65)",
+    padding: "0.4rem 0.875rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    fontWeight: 500,
   },
   logoutBtn: {
     background: "transparent",

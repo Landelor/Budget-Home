@@ -1,9 +1,14 @@
+import { useState } from "react";
 import { useAuth } from "./hooks/useAuth.js";
 import { AuthPage } from "./pages/AuthPage.js";
 import { AccountsPage } from "./pages/AccountsPage.js";
+import { TransactionsPage } from "./pages/TransactionsPage.js";
+
+type Page = "transactions" | "accounts";
 
 export function App() {
   const { isAuthenticated, loading, error, login, register, logout } = useAuth();
+  const [page, setPage] = useState<Page>("transactions");
 
   if (!isAuthenticated) {
     return (
@@ -16,5 +21,14 @@ export function App() {
     );
   }
 
-  return <AccountsPage onLogout={logout} />;
+  if (page === "accounts") {
+    return (
+      <AccountsPage
+        onLogout={logout}
+        onNavigate={(p) => setPage(p as Page)}
+      />
+    );
+  }
+
+  return <TransactionsPage onLogout={logout} onNavigate={(p) => setPage(p)} />;
 }
