@@ -19,6 +19,13 @@ export async function register(email: string, password: string): Promise<void> {
   });
 }
 
+export async function refresh(refreshToken: string): Promise<AuthResponse> {
+  return apiFetch<AuthResponse>("/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+  });
+}
+
 export async function logout(refreshToken: string): Promise<void> {
   await apiFetch<void>("/auth/logout", {
     method: "POST",

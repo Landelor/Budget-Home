@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { login as apiLogin, register as apiRegister, logout as apiLogout } from "../api/auth.js";
 
 interface AuthState {
@@ -13,6 +13,14 @@ export function useAuth() {
     error: null,
     loading: false,
   });
+
+  useEffect(() => {
+    function onExpired() {
+      setState({ isAuthenticated: false, error: null, loading: false });
+    }
+    window.addEventListener("auth:expired", onExpired);
+    return () => window.removeEventListener("auth:expired", onExpired);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setState((s) => ({ ...s, loading: true, error: null }));
