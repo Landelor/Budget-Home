@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { listCategories, type Category } from "../api/categories.js";
 import { useBudgets } from "../hooks/useBudgets.js";
+import { useTheme } from "../hooks/useTheme.js";
 import { BudgetForm } from "../components/BudgetForm.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 import type { Budget, BudgetPeriod } from "../api/budgets.js";
@@ -37,6 +38,7 @@ function ProgressBar({ pct, overBudget }: { pct: number; overBudget: boolean }) 
 
 export function DashboardPage({ onLogout, onNavigate }: Props) {
   const { budgets, summary, loading, error, add, edit, remove, refresh } = useBudgets();
+  const { isDark, toggleTheme } = useTheme();
   const [categories, setCategories] = useState<Category[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<Budget | null>(null);
@@ -106,6 +108,9 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
             Settings
           </button>
         </nav>
+        <button onClick={toggleTheme} style={styles.themeBtn} type="button" title="Toggle dark mode">
+          {isDark ? "Light mode" : "Dark mode"}
+        </button>
         <button onClick={onLogout} style={styles.logoutBtn} type="button">
           Sign out
         </button>
@@ -179,8 +184,8 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
               key={budget.id}
               style={{
                 ...styles.budgetCard,
-                borderColor: overBudget ? "#fca5a5" : "#e5e7eb",
-                background: overBudget ? "#fff8f8" : "#fff",
+                borderColor: overBudget ? "#fca5a5" : "var(--border)",
+                background: overBudget ? (isDark ? "#2d1515" : "#fff8f8") : "var(--bg-card)",
               }}
             >
               <div style={styles.budgetTop}>
@@ -224,7 +229,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
 
               <div style={styles.budgetAmounts}>
                 <span style={styles.spendLabel}>
-                  <span style={{ color: overBudget ? "#dc2626" : "#374151", fontWeight: 600 }}>
+                  <span style={{ color: overBudget ? "#dc2626" : "var(--text-label)", fontWeight: 600 }}>
                     {fmt(spend)}
                   </span>
                   {" spent of "}
@@ -243,7 +248,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
               </div>
 
               <div style={styles.pctRow}>
-                <span style={{ color: overBudget ? "#dc2626" : "#6b7280", fontSize: "0.8rem" }}>
+                <span style={{ color: overBudget ? "#dc2626" : "var(--text-secondary)", fontSize: "0.8rem" }}>
                   {Math.round(pct)}% used
                 </span>
               </div>
@@ -283,7 +288,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f5f7fa",
+    background: "var(--bg-page)",
     fontFamily: "system-ui, sans-serif",
   },
   header: {
@@ -318,6 +323,15 @@ const styles: Record<string, React.CSSProperties> = {
     background: "rgba(255,255,255,0.12)",
     color: "#fff",
   },
+  themeBtn: {
+    background: "transparent",
+    border: "1px solid rgba(255,255,255,0.3)",
+    color: "rgba(255,255,255,0.8)",
+    padding: "0.4rem 0.75rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.8rem",
+  },
   logoutBtn: {
     background: "transparent",
     border: "1px solid rgba(255,255,255,0.3)",
@@ -339,11 +353,11 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: "2rem",
   },
   summaryCard: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     padding: "1.25rem",
     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-    border: "1px solid #e5e7eb",
+    border: "1px solid var(--border)",
   },
   overBudgetCard: {
     borderColor: "#fca5a5",
@@ -353,7 +367,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 0 0.375rem",
     fontSize: "0.8rem",
     fontWeight: 500,
-    color: "#6b7280",
+    color: "var(--text-secondary)",
     textTransform: "uppercase",
     letterSpacing: "0.04em",
   },
@@ -361,7 +375,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: "1.5rem",
     fontWeight: 700,
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
   },
   titleRow: {
     display: "flex",
@@ -373,7 +387,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: "1.5rem",
     fontWeight: 700,
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
   },
   addBtn: {
     padding: "0.6rem 1.25rem",
@@ -386,7 +400,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.9rem",
   },
   status: {
-    color: "#6b7280",
+    color: "var(--text-secondary)",
     textAlign: "center",
     padding: "3rem 0",
   },
@@ -401,27 +415,27 @@ const styles: Record<string, React.CSSProperties> = {
   emptyState: {
     textAlign: "center",
     padding: "4rem 2rem",
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
   },
   emptyTitle: {
     fontSize: "1.1rem",
     fontWeight: 600,
-    color: "#374151",
+    color: "var(--text-label)",
     margin: "0 0 0.5rem",
   },
   emptySub: {
-    color: "#6b7280",
+    color: "var(--text-secondary)",
     margin: "0 0 1.5rem",
     fontSize: "0.95rem",
   },
   budgetCard: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     padding: "1.25rem",
     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-    border: "1px solid #e5e7eb",
+    border: "1px solid var(--border)",
     marginBottom: "0.875rem",
   },
   budgetTop: {
@@ -447,8 +461,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   periodBadge: {
     fontSize: "0.75rem",
-    color: "#6b7280",
-    background: "#f3f4f6",
+    color: "var(--text-secondary)",
+    background: "var(--bg-subtle)",
     padding: "0.2rem 0.5rem",
     borderRadius: "999px",
     fontWeight: 500,
@@ -478,7 +492,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   barTrack: {
     height: "8px",
-    background: "#f3f4f6",
+    background: "var(--bg-subtle)",
     borderRadius: "999px",
     overflow: "hidden",
     marginBottom: "0.625rem",
@@ -493,10 +507,10 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "center",
     fontSize: "0.875rem",
-    color: "#374151",
+    color: "var(--text-label)",
   },
   spendLabel: {
-    color: "#374151",
+    color: "var(--text-label)",
     fontSize: "0.875rem",
   },
   remainingLabel: {

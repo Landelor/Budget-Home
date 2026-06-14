@@ -54,7 +54,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "1rem",
   },
   modal: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     padding: "1.75rem",
     width: "100%",
@@ -65,11 +65,11 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 0 0.75rem",
     fontSize: "1.1rem",
     fontWeight: 600,
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
   },
   body: {
     margin: "0 0 1rem",
-    color: "#555",
+    color: "var(--text-secondary)",
     fontSize: "0.95rem",
     lineHeight: 1.5,
   },
@@ -88,11 +88,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cancelBtn: {
     padding: "0.625rem 1.25rem",
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--border-input)",
     borderRadius: "8px",
     background: "transparent",
     cursor: "pointer",
     fontSize: "0.9rem",
+    color: "var(--text-label)",
   },
   deleteBtn: {
     padding: "0.625rem 1.25rem",

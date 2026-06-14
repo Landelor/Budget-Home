@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "./hooks/useAuth.js";
+import { ThemeProvider } from "./hooks/useTheme.js";
 import { AuthPage } from "./pages/AuthPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { AccountsPage } from "./pages/AccountsPage.js";
@@ -14,46 +15,43 @@ export function App() {
 
   if (!isAuthenticated) {
     return (
-      <AuthPage
-        onLogin={login}
-        onRegister={register}
-        loading={loading}
-        error={error}
-      />
-    );
-  }
-
-  if (page === "accounts") {
-    return (
-      <AccountsPage
-        onLogout={logout}
-        onNavigate={(p) => setPage(p as Page)}
-      />
-    );
-  }
-
-  if (page === "transactions") {
-    return (
-      <TransactionsPage
-        onLogout={logout}
-        onNavigate={(p) => setPage(p as Page)}
-      />
-    );
-  }
-
-  if (page === "settings") {
-    return (
-      <SettingsPage
-        onLogout={logout}
-        onNavigate={(p) => setPage(p as Page)}
-      />
+      <ThemeProvider isAuthenticated={false}>
+        <AuthPage
+          onLogin={login}
+          onRegister={register}
+          loading={loading}
+          error={error}
+        />
+      </ThemeProvider>
     );
   }
 
   return (
-    <DashboardPage
-      onLogout={logout}
-      onNavigate={(p) => setPage(p as Page)}
-    />
+    <ThemeProvider isAuthenticated={true}>
+      {page === "accounts" && (
+        <AccountsPage
+          onLogout={logout}
+          onNavigate={(p) => setPage(p as Page)}
+        />
+      )}
+      {page === "transactions" && (
+        <TransactionsPage
+          onLogout={logout}
+          onNavigate={(p) => setPage(p as Page)}
+        />
+      )}
+      {page === "settings" && (
+        <SettingsPage
+          onLogout={logout}
+          onNavigate={(p) => setPage(p as Page)}
+        />
+      )}
+      {page === "dashboard" && (
+        <DashboardPage
+          onLogout={logout}
+          onNavigate={(p) => setPage(p as Page)}
+        />
+      )}
+    </ThemeProvider>
   );
 }
