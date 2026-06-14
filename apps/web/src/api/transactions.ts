@@ -70,3 +70,23 @@ export function updateTransaction(id: string, input: UpdateTransactionInput): Pr
 export function deleteTransaction(id: string): Promise<void> {
   return apiFetch<void>(`/transactions/${id}`, { method: "DELETE" });
 }
+
+export interface ImportTransactionRow {
+  date: string;
+  description: string;
+  amount: number;
+}
+
+export interface ImportTransactionsResponse {
+  imported: number;
+}
+
+export function importTransactions(
+  accountId: string,
+  transactions: ImportTransactionRow[],
+): Promise<ImportTransactionsResponse> {
+  return apiFetch<ImportTransactionsResponse>("/transactions/import", {
+    method: "POST",
+    body: JSON.stringify({ accountId, transactions }),
+  });
+}

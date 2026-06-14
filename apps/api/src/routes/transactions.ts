@@ -204,6 +204,82 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
     },
   });
 
+  app.post<{
+    Body: {
+      accountId: string;
+      transactions: Array<{
+        date: string;
+        description: string;
+        amount: number;
+      }>;
+    };
+  }>("/transactions/import", {
+    schema: {
+      body: {
+        type: "object",
+        required: ["accountId", "transactions"],
+        additionalProperties: false,
+        properties: {
+          accountId: { type: "string", format: "uuid" },
+          transactions: {
+            type: "array",
+            minItems: 1,
+            maxItems: 1000,
+            items: {
+              type: "object",
+              required: ["date", "description", "amount"],
+              additionalProperties: false,
+              properties: {
+                date: { type: "string" },
+                description: { type: "string", minLength: 1, maxLength: 255 },
+                amount: { type: "number" },
+              },
+            },
+          },
+        },
+      },
+    },
+    handler: async (request, reply) => {
+      const { accountId, transactions: rows } = request.body;
+
+      const [account] = await db
+        .select()
+        .from(accounts)
+        .where(and(eq(accounts.id, accountId), isNull(accounts.deletedAt)))
+        .limit(1);
+
+      if (!account) {
+        return reply
+          .status(404)
+          .send({ error: "not_found", message: "Account not found", field: "accountId" });
+      }
+      if (account.userId !== request.user.id) {
+        return reply.status(403).send({ error: "forbidden", message: "Access denied" });
+      }
+
+      const values = rows.map((row) => ({
+        accountId,
+        userId: request.user.id,
+        amount: row.amount.toFixed(2),
+        date: row.date,
+        description: row.description.slice(0, 255),
+        isRecurring: false as const,
+      }));
+
+      await db.insert(transactions).values(values);
+
+      const totalAmount = rows.reduce((sum, r) => sum + r.amount, 0);
+      await db
+        .update(accounts)
+        .set({
+          currentBalance: sql`${accounts.currentBalance}::numeric + ${totalAmount.toFixed(2)}::numeric`,
+        })
+        .where(eq(accounts.id, accountId));
+
+      return reply.status(201).send({ imported: rows.length });
+    },
+  });
+
   app.delete<{ Params: { id: string } }>("/transactions/:id", {
     schema: {
       params: {

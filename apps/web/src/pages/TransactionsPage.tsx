@@ -11,6 +11,7 @@ import {
 import { TransactionForm } from "../components/TransactionForm.js";
 import { FilterBar, type Filters } from "../components/FilterBar.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
+import { CsvImportModal } from "../components/CsvImportModal.js";
 
 interface Props {
   onLogout: () => void;
@@ -65,6 +66,8 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Transaction | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([listAccounts(), listCategories()])
@@ -115,6 +118,13 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
   function handleAdd() {
     setEditTarget(null);
     setShowForm(true);
+  }
+
+  async function handleImportDone(imported: number) {
+    setShowImport(false);
+    setImportSuccess(`Successfully imported ${imported} transaction${imported !== 1 ? "s" : ""}.`);
+    setTimeout(() => setImportSuccess(null), 5000);
+    await loadPage(1, filters, false);
   }
 
   function handleEdit(tx: Transaction) {
@@ -180,10 +190,17 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
       <main style={styles.main}>
         <div style={styles.titleRow}>
           <h2 style={styles.pageTitle}>Transactions</h2>
-          <button onClick={handleAdd} style={styles.addBtn} type="button">
-            + Add transaction
-          </button>
+          <div style={styles.titleActions}>
+            <button onClick={() => setShowImport(true)} style={styles.importBtn} type="button">
+              Import CSV
+            </button>
+            <button onClick={handleAdd} style={styles.addBtn} type="button">
+              + Add transaction
+            </button>
+          </div>
         </div>
+
+        {importSuccess && <p style={styles.successMsg}>{importSuccess}</p>}
 
         <FilterBar
           accounts={accounts}
@@ -305,6 +322,14 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+
+      {showImport && (
+        <CsvImportModal
+          accounts={accounts}
+          onDone={handleImportDone}
+          onCancel={() => setShowImport(false)}
+        />
+      )}
     </div>
   );
 }
@@ -374,6 +399,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: "#1a1a2e",
   },
+  titleActions: {
+    display: "flex",
+    gap: "0.75rem",
+    alignItems: "center",
+  },
+  importBtn: {
+    padding: "0.6rem 1.25rem",
+    background: "#fff",
+    color: "#4f46e5",
+    border: "1px solid #4f46e5",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: "0.9rem",
+  },
   addBtn: {
     padding: "0.6rem 1.25rem",
     background: "#4f46e5",
@@ -383,6 +423,15 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontWeight: 600,
     fontSize: "0.9rem",
+  },
+  successMsg: {
+    color: "#15803d",
+    background: "#f0fdf4",
+    border: "1px solid #86efac",
+    padding: "0.75rem 1rem",
+    borderRadius: "8px",
+    fontSize: "0.9rem",
+    marginBottom: "1rem",
   },
   errorMsg: {
     color: "#dc2626",
