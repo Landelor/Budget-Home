@@ -40,10 +40,10 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
             eq(transactions.userId, userId),
             isNull(transactions.deletedAt),
             sql`${transactions.date} >= CASE
-              WHEN ${budgets.period} = 'monthly' THEN date_trunc('month', CURRENT_DATE)::text
-              ELSE date_trunc('week', CURRENT_DATE)::text
+              WHEN ${budgets.period} = 'monthly' THEN date_trunc('month', CURRENT_DATE)
+              ELSE date_trunc('week', CURRENT_DATE)
             END`,
-            sql`${transactions.date} <= CURRENT_DATE::text`,
+            sql`${transactions.date} <= CURRENT_DATE`,
           ),
         )
         .where(and(eq(budgets.userId, userId), isNull(budgets.deletedAt)))
