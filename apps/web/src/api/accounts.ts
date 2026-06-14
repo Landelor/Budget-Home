@@ -20,6 +20,7 @@ export function listAccounts(): Promise<Account[]> {
 export function createAccount(body: {
   name: string;
   type: AccountType;
+  currency?: string;
   initialBalance?: number;
 }): Promise<Account> {
   return apiFetch<Account>("/accounts", {

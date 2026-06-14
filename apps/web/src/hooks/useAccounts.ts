@@ -36,8 +36,8 @@ export function useAccounts() {
   }, [refresh]);
 
   const add = useCallback(
-    async (name: string, type: AccountType, initialBalance: number) => {
-      const account = await createAccount({ name, type, initialBalance });
+    async (name: string, type: AccountType, initialBalance: number, currency: string) => {
+      const account = await createAccount({ name, type, initialBalance, currency });
       setState((s) => ({ ...s, accounts: [...s.accounts, account] }));
     },
     [],

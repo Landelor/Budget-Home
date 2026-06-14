@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from "react";
 import type { Account, AccountType } from "../api/accounts.js";
+import { SUPPORTED_CURRENCIES } from "../api/settings.js";
 
 interface Props {
   initial?: Account;
-  onSubmit: (name: string, type: AccountType, initialBalance: number) => Promise<void>;
+  onSubmit: (name: string, type: AccountType, initialBalance: number, currency: string) => Promise<void>;
   onCancel: () => void;
   title: string;
+  defaultCurrency?: string;
 }
 
 const ACCOUNT_TYPES: { value: AccountType; label: string }[] = [
@@ -15,9 +17,10 @@ const ACCOUNT_TYPES: { value: AccountType; label: string }[] = [
   { value: "cash", label: "Cash" },
 ];
 
-export function AccountForm({ initial, onSubmit, onCancel, title }: Props) {
+export function AccountForm({ initial, onSubmit, onCancel, title, defaultCurrency = "USD" }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
   const [type, setType] = useState<AccountType>(initial?.type ?? "checking");
+  const [currency, setCurrency] = useState(initial?.currency ?? defaultCurrency);
   const [balance, setBalance] = useState(initial ? parseFloat(initial.currentBalance) : 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +30,7 @@ export function AccountForm({ initial, onSubmit, onCancel, title }: Props) {
     setLoading(true);
     setError(null);
     try {
-      await onSubmit(name.trim(), type, balance);
+      await onSubmit(name.trim(), type, balance, currency);
     } catch (e) {
       setError((e as Error).message);
       setLoading(false);
@@ -61,9 +64,19 @@ export function AccountForm({ initial, onSubmit, onCancel, title }: Props) {
               ))}
             </select>
           </label>
+          <label style={styles.label}>
+            Currency
+            <select value={currency} onChange={(e) => setCurrency(e.target.value)} style={styles.input}>
+              {SUPPORTED_CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
           {!initial && (
             <label style={styles.label}>
-              Opening balance ($)
+              Opening balance
               <input
                 type="number"
                 step="0.01"

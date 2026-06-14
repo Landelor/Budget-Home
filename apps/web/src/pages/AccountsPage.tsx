@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccounts } from "../hooks/useAccounts.js";
 import { AccountForm } from "../components/AccountForm.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 import type { Account, AccountType } from "../api/accounts.js";
+import { getSettings } from "../api/settings.js";
 
 const TYPE_LABELS: Record<AccountType, string> = {
   checking: "Checking",
@@ -28,13 +29,20 @@ export function AccountsPage({ onLogout, onNavigate }: Props) {
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Account | null>(null);
   const [deleting, setDeleting] = useState<Account | null>(null);
+  const [defaultCurrency, setDefaultCurrency] = useState("USD");
 
-  async function handleAdd(name: string, type: AccountType, initialBalance: number) {
-    await add(name, type, initialBalance);
+  useEffect(() => {
+    getSettings()
+      .then((s) => setDefaultCurrency(s.defaultCurrency))
+      .catch(() => {});
+  }, []);
+
+  async function handleAdd(name: string, type: AccountType, initialBalance: number, currency: string) {
+    await add(name, type, initialBalance, currency);
     setShowAdd(false);
   }
 
-  async function handleEdit(name: string, type: AccountType) {
+  async function handleEdit(name: string, type: AccountType, _balance: number, _currency: string) {
     if (!editing) return;
     await edit(editing.id, name, type);
     setEditing(null);
@@ -71,6 +79,13 @@ export function AccountsPage({ onLogout, onNavigate }: Props) {
               type="button"
             >
               Accounts
+            </button>
+            <button
+              style={styles.navBtn}
+              type="button"
+              onClick={() => onNavigate("settings")}
+            >
+              Settings
             </button>
           </nav>
         )}
@@ -151,6 +166,7 @@ export function AccountsPage({ onLogout, onNavigate }: Props) {
           title="Add account"
           onSubmit={handleAdd}
           onCancel={() => setShowAdd(false)}
+          defaultCurrency={defaultCurrency}
         />
       )}
 
