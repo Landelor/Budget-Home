@@ -16,6 +16,7 @@ export async function buildApp() {
     logger: {
       level: process.env["LOG_LEVEL"] ?? "info",
     },
+    bodyLimit: 10 * 1024 * 1024, // 10 MB — supports large CSV imports
   });
 
   await app.register(cors, {
