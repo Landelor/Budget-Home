@@ -224,7 +224,6 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
           transactions: {
             type: "array",
             minItems: 1,
-            maxItems: 1000,
             items: {
               type: "object",
               required: ["date", "description", "amount"],
