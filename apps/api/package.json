@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pkill -f 'tsx watch src/index.ts' 2>/dev/null; sleep 0.3; sh -c 'set -a; . ./.env; set +a; tsx watch src/index.ts'",
+    "dev": "sh scripts/dev.sh",
     "build": "tsc --noEmit && tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
