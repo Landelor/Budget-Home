@@ -40,9 +40,19 @@ function parseAmount(credit: string, debit: string): number | null {
   }
   if (d !== "") {
     const n = parseFloat(d);
-    return isNaN(n) ? null : -n;
+    if (isNaN(n)) return null;
+    // Some banks export debit amounts as negative values in the debit column.
+    // Normalise: debits must always reduce the balance (negative).
+    return n > 0 ? -n : n;
   }
   return null;
+}
+
+function parseSingleAmount(raw: string): number | null {
+  const cleaned = raw.replace(/[$,\s]/g, "").trim();
+  if (cleaned === "") return null;
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
 }
 
 // Minimal RFC 4180-aware CSV line splitter.
@@ -83,12 +93,16 @@ function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[
   const descIdx = header.indexOf("description");
   const creditIdx = header.indexOf("credit");
   const debitIdx = header.indexOf("debit");
+  const amountIdx = header.indexOf("amount");
 
-  if (dateIdx === -1 || descIdx === -1 || (creditIdx === -1 && debitIdx === -1)) {
+  const hasSeparateColumns = creditIdx !== -1 || debitIdx !== -1;
+  const hasSingleAmount = amountIdx !== -1;
+
+  if (dateIdx === -1 || descIdx === -1 || (!hasSeparateColumns && !hasSingleAmount)) {
     return {
       rows: [],
       errors: [
-        "CSV must have Date, Description, and at least one of Credit or Debit columns.",
+        "CSV must have Date, Description, and either an Amount column or Credit/Debit columns.",
       ],
     };
   }
@@ -100,8 +114,6 @@ function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[
     const cols = splitCsvLine(lines[i]!);
     const rawDate = cols[dateIdx]?.trim() ?? "";
     const rawDesc = cols[descIdx]?.trim() ?? "";
-    const rawCredit = creditIdx !== -1 ? (cols[creditIdx]?.trim() ?? "") : "";
-    const rawDebit = debitIdx !== -1 ? (cols[debitIdx]?.trim() ?? "") : "";
 
     const date = normaliseDate(rawDate);
     if (!date) {
@@ -112,7 +124,16 @@ function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[
       errors.push(`Row ${i + 1}: missing description`);
       continue;
     }
-    const amount = parseAmount(rawCredit, rawDebit);
+
+    let amount: number | null;
+    if (hasSeparateColumns) {
+      const rawCredit = creditIdx !== -1 ? (cols[creditIdx]?.trim() ?? "") : "";
+      const rawDebit = debitIdx !== -1 ? (cols[debitIdx]?.trim() ?? "") : "";
+      amount = parseAmount(rawCredit, rawDebit);
+    } else {
+      amount = parseSingleAmount(cols[amountIdx]?.trim() ?? "");
+    }
+
     if (amount === null) {
       errors.push(`Row ${i + 1}: no valid credit or debit amount`);
       continue;
@@ -167,7 +188,8 @@ export function CsvImportModal({ accounts, onDone, onCancel }: Props) {
         <h2 style={styles.title}>Import transactions from CSV</h2>
 
         <p style={styles.hint}>
-          Expected columns: <strong>Date, Description, Credit, Debit</strong> (Balance is ignored).
+          Expected columns: <strong>Date, Description, Amount</strong> (negative = debit) or{" "}
+          <strong>Credit, Debit</strong> (Balance is ignored).
         </p>
 
         <label style={styles.label}>Account</label>
