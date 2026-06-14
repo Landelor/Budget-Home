@@ -13,12 +13,16 @@ interface Props {
 function normaliseDate(raw: string): string | null {
   const iso = raw.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  const mdy = iso.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (mdy) {
-    const m = mdy[1]!;
-    const d = mdy[2]!;
-    const y = mdy[3]!;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  const slashDate = iso.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    let first = parseInt(slashDate[1]!, 10);
+    let second = parseInt(slashDate[2]!, 10);
+    const y = slashDate[3]!;
+    // If first number > 12 it cannot be a month — treat as DD/MM/YYYY
+    if (first > 12) {
+      [first, second] = [second, first];
+    }
+    return `${y}-${String(first).padStart(2, "0")}-${String(second).padStart(2, "0")}`;
   }
   const parsed = new Date(iso);
   if (!isNaN(parsed.getTime())) {
