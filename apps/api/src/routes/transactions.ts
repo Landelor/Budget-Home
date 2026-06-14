@@ -265,15 +265,20 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         isRecurring: false as const,
       }));
 
-      await db.insert(transactions).values(values);
-
+      const BATCH_SIZE = 1000;
       const totalAmount = rows.reduce((sum, r) => sum + r.amount, 0);
-      await db
-        .update(accounts)
-        .set({
-          currentBalance: sql`${accounts.currentBalance}::numeric + ${totalAmount.toFixed(2)}::numeric`,
-        })
-        .where(eq(accounts.id, accountId));
+
+      await db.transaction(async (tx) => {
+        for (let i = 0; i < values.length; i += BATCH_SIZE) {
+          await tx.insert(transactions).values(values.slice(i, i + BATCH_SIZE));
+        }
+        await tx
+          .update(accounts)
+          .set({
+            currentBalance: sql`${accounts.currentBalance}::numeric + ${totalAmount.toFixed(2)}::numeric`,
+          })
+          .where(eq(accounts.id, accountId));
+      });
 
       return reply.status(201).send({ imported: rows.length });
     },
