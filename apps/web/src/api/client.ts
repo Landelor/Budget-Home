@@ -14,6 +14,18 @@ function getToken(): string | null {
   return localStorage.getItem("accessToken");
 }
 
+async function readJson<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text) {
+    throw new ApiError(res.status, "Server returned an empty response — the API may be down");
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new ApiError(res.status, "Server returned a non-JSON response — the API may be down");
+  }
+}
+
 // Singleton refresh promise to prevent parallel refresh races
 let refreshingPromise: Promise<boolean> | null = null;
 
@@ -80,7 +92,7 @@ export async function apiFetch<T>(
         headers: retryHeaders,
       });
       if (retryRes.status === 204) return undefined as T;
-      const retryData = await retryRes.json();
+      const retryData = await readJson<Record<string, string>>(retryRes);
       if (!retryRes.ok) {
         throw new ApiError(retryRes.status, retryData?.message ?? retryData?.error ?? "Request failed");
       }
@@ -92,7 +104,7 @@ export async function apiFetch<T>(
 
   if (res.status === 204) return undefined as T;
 
-  const data = await res.json();
+  const data = await readJson<Record<string, string>>(res);
   if (!res.ok) {
     throw new ApiError(res.status, data?.message ?? data?.error ?? "Request failed");
   }
