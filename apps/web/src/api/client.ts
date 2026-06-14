@@ -59,7 +59,7 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
     ...(options.headers as Record<string, string>),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -71,7 +71,7 @@ export async function apiFetch<T>(
     if (refreshed) {
       const newToken = getToken();
       const retryHeaders: Record<string, string> = {
-        "Content-Type": "application/json",
+        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(options.headers as Record<string, string>),
       };
       if (newToken) retryHeaders["Authorization"] = `Bearer ${newToken}`;
