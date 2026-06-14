@@ -3,6 +3,7 @@ import { apiFetch } from "./client.js";
 export interface UserSettings {
   defaultCurrency: string;
   darkMode: boolean;
+  dateFormat: "MDY" | "DMY";
 }
 
 export const SUPPORTED_CURRENCIES = [

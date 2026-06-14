@@ -10,6 +10,7 @@ interface Props {
 export function SettingsPage({ onLogout, onNavigate }: Props) {
   const { isDark, toggleTheme } = useTheme();
   const [defaultCurrency, setDefaultCurrency] = useState("USD");
+  const [dateFormat, setDateFormat] = useState<"MDY" | "DMY">("MDY");
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -19,6 +20,7 @@ export function SettingsPage({ onLogout, onNavigate }: Props) {
     getSettings()
       .then((s) => {
         setDefaultCurrency(s.defaultCurrency);
+        setDateFormat(s.dateFormat ?? "MDY");
         setLoading(false);
       })
       .catch((e) => {
@@ -33,8 +35,9 @@ export function SettingsPage({ onLogout, onNavigate }: Props) {
     setError(null);
     setSaved(false);
     try {
-      const result = await updateSettings({ defaultCurrency });
+      const result = await updateSettings({ defaultCurrency, dateFormat });
       setDefaultCurrency(result.defaultCurrency);
+      setDateFormat(result.dateFormat ?? "MDY");
       setSaved(true);
     } catch (e) {
       setError((e as Error).message);
@@ -107,9 +110,9 @@ export function SettingsPage({ onLogout, onNavigate }: Props) {
             </div>
 
             <div style={{ ...styles.card, marginTop: "1rem" }}>
-              <h3 style={styles.sectionTitle}>Currency</h3>
+              <h3 style={styles.sectionTitle}>Currency &amp; Date Format</h3>
               <p style={styles.sectionDesc}>
-                Set your default currency. New accounts will use this currency by default.
+                Set your default currency and the date format used when importing CSV files.
               </p>
               <form onSubmit={handleSubmit} style={styles.form}>
                 <label style={styles.label}>
@@ -124,6 +127,17 @@ export function SettingsPage({ onLogout, onNavigate }: Props) {
                         {c.label}
                       </option>
                     ))}
+                  </select>
+                </label>
+                <label style={styles.label}>
+                  CSV date format
+                  <select
+                    value={dateFormat}
+                    onChange={(e) => { setDateFormat(e.target.value as "MDY" | "DMY"); setSaved(false); }}
+                    style={styles.select}
+                  >
+                    <option value="MDY">MM/DD/YYYY (US)</option>
+                    <option value="DMY">DD/MM/YYYY (international)</option>
                   </select>
                 </label>
                 {error && <p style={styles.error}>{error}</p>}

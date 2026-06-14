@@ -26,6 +26,7 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   defaultCurrency: varchar("default_currency", { length: 3 }).notNull().default("USD"),
   darkMode: boolean("dark_mode").notNull().default(false),
+  dateFormat: varchar("date_format", { length: 3 }).notNull().default("MDY"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

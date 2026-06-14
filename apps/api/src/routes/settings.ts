@@ -8,13 +8,19 @@ const SUPPORTED_CURRENCIES = [
   "MXN", "SGD", "HKD", "NOK", "SEK", "DKK", "NZD", "ZAR", "KRW", "TRY",
 ];
 
+const SUPPORTED_DATE_FORMATS = ["MDY", "DMY"];
+
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
   app.get("/settings", {
     handler: async (request, reply) => {
       const [user] = await db
-        .select({ defaultCurrency: users.defaultCurrency, darkMode: users.darkMode })
+        .select({
+          defaultCurrency: users.defaultCurrency,
+          darkMode: users.darkMode,
+          dateFormat: users.dateFormat,
+        })
         .from(users)
         .where(eq(users.id, request.user.id))
         .limit(1);
@@ -23,11 +29,15 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "not_found", message: "User not found" });
       }
 
-      return reply.send({ defaultCurrency: user.defaultCurrency, darkMode: user.darkMode });
+      return reply.send({
+        defaultCurrency: user.defaultCurrency,
+        darkMode: user.darkMode,
+        dateFormat: user.dateFormat,
+      });
     },
   });
 
-  app.patch<{ Body: { defaultCurrency?: string; darkMode?: boolean } }>("/settings", {
+  app.patch<{ Body: { defaultCurrency?: string; darkMode?: boolean; dateFormat?: string } }>("/settings", {
     schema: {
       body: {
         type: "object",
@@ -42,15 +52,20 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
           darkMode: {
             type: "boolean",
           },
+          dateFormat: {
+            type: "string",
+            enum: SUPPORTED_DATE_FORMATS,
+          },
         },
       },
     },
     handler: async (request, reply) => {
-      const { defaultCurrency, darkMode } = request.body;
+      const { defaultCurrency, darkMode, dateFormat } = request.body;
 
       const updates: Record<string, unknown> = {};
       if (defaultCurrency !== undefined) updates.defaultCurrency = defaultCurrency;
       if (darkMode !== undefined) updates.darkMode = darkMode;
+      if (dateFormat !== undefined) updates.dateFormat = dateFormat;
 
       if (Object.keys(updates).length === 0) {
         return reply.status(400).send({ error: "bad_request", message: "No fields to update" });
@@ -60,13 +75,21 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         .update(users)
         .set(updates)
         .where(eq(users.id, request.user.id))
-        .returning({ defaultCurrency: users.defaultCurrency, darkMode: users.darkMode });
+        .returning({
+          defaultCurrency: users.defaultCurrency,
+          darkMode: users.darkMode,
+          dateFormat: users.dateFormat,
+        });
 
       if (!updated) {
         return reply.status(404).send({ error: "not_found", message: "User not found" });
       }
 
-      return reply.send({ defaultCurrency: updated.defaultCurrency, darkMode: updated.darkMode });
+      return reply.send({
+        defaultCurrency: updated.defaultCurrency,
+        darkMode: updated.darkMode,
+        dateFormat: updated.dateFormat,
+      });
     },
   });
 }

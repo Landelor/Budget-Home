@@ -43,6 +43,13 @@
       "when": 1781733099103,
       "tag": "0005_dark_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781833099103,
+      "tag": "0006_date_format",
+      "breakpoints": true
     }
   ]
 }

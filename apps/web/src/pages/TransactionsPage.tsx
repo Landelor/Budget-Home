@@ -8,6 +8,7 @@ import {
   deleteTransaction,
   type Transaction,
 } from "../api/transactions.js";
+import { getSettings } from "../api/settings.js";
 import { useTheme } from "../hooks/useTheme.js";
 import { TransactionForm } from "../components/TransactionForm.js";
 import { FilterBar, type Filters } from "../components/FilterBar.js";
@@ -69,14 +70,16 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [dateFormat, setDateFormat] = useState<"MDY" | "DMY">("MDY");
 
   const { isDark, toggleTheme } = useTheme();
 
   useEffect(() => {
-    Promise.all([listAccounts(), listCategories()])
-      .then(([accs, cats]) => {
+    Promise.all([listAccounts(), listCategories(), getSettings()])
+      .then(([accs, cats, settings]) => {
         setAccounts(accs);
         setCategories(cats);
+        setDateFormat(settings.dateFormat ?? "MDY");
       })
       .catch((e) => console.error("Failed to load accounts/categories:", e));
   }, []);
@@ -334,6 +337,7 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
           accounts={accounts}
           onDone={handleImportDone}
           onCancel={() => setShowImport(false)}
+          dateFormat={dateFormat}
         />
       )}
     </div>

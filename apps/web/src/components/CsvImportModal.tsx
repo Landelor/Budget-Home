@@ -6,11 +6,12 @@ interface Props {
   accounts: Account[];
   onDone: (imported: number) => void;
   onCancel: () => void;
+  dateFormat?: "MDY" | "DMY";
 }
 
 // Normalise a date string to YYYY-MM-DD.
-// Accepts: YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY (falls back to JS Date parse).
-function normaliseDate(raw: string): string | null {
+// Accepts: YYYY-MM-DD, MM/DD/YYYY or DD/MM/YYYY depending on dateFormat preference.
+function normaliseDate(raw: string, dateFormat: "MDY" | "DMY" = "MDY"): string | null {
   const iso = raw.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   const slashDate = iso.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -18,11 +19,15 @@ function normaliseDate(raw: string): string | null {
     let first = parseInt(slashDate[1]!, 10);
     let second = parseInt(slashDate[2]!, 10);
     const y = slashDate[3]!;
-    // If first number > 12 it cannot be a month — treat as DD/MM/YYYY
-    if (first > 12) {
+    // If first > 12 it must be a day — swap regardless of format preference.
+    // Otherwise honour the user's date format setting.
+    if (first > 12 || dateFormat === "DMY") {
       [first, second] = [second, first];
     }
-    return `${y}-${String(first).padStart(2, "0")}-${String(second).padStart(2, "0")}`;
+    const month = first;
+    const day = second;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
   const parsed = new Date(iso);
   if (!isNaN(parsed.getTime())) {
@@ -84,7 +89,7 @@ function splitCsvLine(line: string): string[] {
   return fields;
 }
 
-function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[] } {
+function parseCsv(text: string, dateFormat: "MDY" | "DMY" = "MDY"): { rows: ImportTransactionRow[]; errors: string[] } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
   if (lines.length < 2) return { rows: [], errors: ["File appears empty or has no data rows."] };
 
@@ -115,7 +120,7 @@ function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[
     const rawDate = cols[dateIdx]?.trim() ?? "";
     const rawDesc = cols[descIdx]?.trim() ?? "";
 
-    const date = normaliseDate(rawDate);
+    const date = normaliseDate(rawDate, dateFormat);
     if (!date) {
       errors.push(`Row ${i + 1}: invalid date "${rawDate}"`);
       continue;
@@ -144,7 +149,7 @@ function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[
   return { rows, errors };
 }
 
-export function CsvImportModal({ accounts, onDone, onCancel }: Props) {
+export function CsvImportModal({ accounts, onDone, onCancel, dateFormat = "MDY" }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [rows, setRows] = useState<ImportTransactionRow[] | null>(null);
@@ -158,7 +163,7 @@ export function CsvImportModal({ accounts, onDone, onCancel }: Props) {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const { rows: parsed, errors } = parseCsv(text);
+      const { rows: parsed, errors } = parseCsv(text, dateFormat);
       setRows(parsed);
       setParseErrors(errors);
       setSubmitError(null);
@@ -189,7 +194,9 @@ export function CsvImportModal({ accounts, onDone, onCancel }: Props) {
 
         <p style={styles.hint}>
           Expected columns: <strong>Date, Description, Amount</strong> (negative = debit) or{" "}
-          <strong>Credit, Debit</strong> (Balance is ignored).
+          <strong>Credit, Debit</strong> (Balance is ignored). Dates parsed as{" "}
+          <strong>{dateFormat === "DMY" ? "DD/MM/YYYY" : "MM/DD/YYYY"}</strong>
+          {" "}— change in Settings.
         </p>
 
         <label style={styles.label}>Account</label>
