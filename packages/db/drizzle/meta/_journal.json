@@ -29,6 +29,13 @@
       "when": 1781533099103,
       "tag": "0003_user_default_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781633099103,
+      "tag": "0004_cleanup_orphaned_transactions",
+      "breakpoints": true
     }
   ]
 }
