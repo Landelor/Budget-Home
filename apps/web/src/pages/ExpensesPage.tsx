@@ -5,6 +5,8 @@ import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 import type { Expense, ExpenseFrequency } from "../api/expenses.js";
 import { getExchangeRates } from "../api/expenses.js";
 import { getSettings, SUPPORTED_CURRENCIES } from "../api/settings.js";
+import { listUtilities } from "../api/utilities.js";
+import type { Utility, UtilityType } from "../api/utilities.js";
 
 const FREQUENCY_LABELS: Record<ExpenseFrequency, string> = {
   fortnightly: "Fortnightly",
@@ -36,6 +38,10 @@ function fmt(n: number, currency: string): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
+}
+
+function fmt2(n: number): string {
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function convertAmount(
@@ -86,6 +92,7 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
   const [rates, setRates] = useState<Record<string, number> | null>(null);
   const [ratesDate, setRatesDate] = useState<string | null>(null);
   const [ratesError, setRatesError] = useState<string | null>(null);
+  const [utilityEntries, setUtilityEntries] = useState<Utility[]>([]);
 
   useEffect(() => {
     getSettings()
@@ -103,6 +110,10 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
       .catch(() => {
         setRatesError("Could not load exchange rates");
       });
+
+    listUtilities()
+      .then(setUtilityEntries)
+      .catch(() => {});
   }, []);
 
   function openAdd() {
@@ -163,6 +174,21 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
     setDeleting(null);
   }
 
+  // Utility averages per type
+  function utilityStats(type: UtilityType) {
+    const rows = utilityEntries.filter((u) => u.type === type);
+    if (rows.length === 0) return null;
+    const avgAmount = rows.reduce((s, u) => s + parseFloat(u.amount), 0) / rows.length;
+    const avgDays = rows.reduce((s, u) => s + u.serviceDays, 0) / rows.length;
+    const perDay = avgAmount / avgDays;
+    const perFortnight = perDay * 14;
+    return { avgAmount, avgDays, perDay, perFortnight, count: rows.length };
+  }
+
+  const utilityTypes: UtilityType[] = ["gas", "power", "water"];
+  const utilityTypeLabels: Record<UtilityType, string> = { gas: "Gas", power: "Power", water: "Water" };
+  const hasUtilities = utilityEntries.length > 0;
+
   // Currencies actually used in expenses (excluding default)
   const foreignCurrencies = [...new Set(
     expenses
@@ -204,6 +230,9 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
           </button>
           <button style={{ ...styles.navBtn, ...styles.navBtnActive }} type="button">
             Expenses
+          </button>
+          <button style={styles.navBtn} type="button" onClick={() => onNavigate("utilities")}>
+            Utilities
           </button>
           <button style={styles.navBtn} type="button" onClick={() => onNavigate("settings")}>
             Settings
@@ -272,6 +301,43 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
               })}
             </div>
             {ratesError && <p style={styles.ratesError}>{ratesError}</p>}
+          </div>
+        )}
+
+        {hasUtilities && (
+          <div style={styles.utilitiesCard}>
+            <div style={styles.utilitiesCardHeader}>
+              <span style={styles.utilitiesCardTitle}>Utilities</span>
+            </div>
+            <div style={styles.utilitiesGrid}>
+              {utilityTypes.map((type) => {
+                const stats = utilityStats(type);
+                if (!stats) return null;
+                return (
+                  <div key={type} style={styles.utilityItem}>
+                    <div style={styles.utilityLabel}>{utilityTypeLabels[type]}</div>
+                    <div style={styles.utilityStats}>
+                      <div style={styles.utilityStat}>
+                        <span style={styles.utilityStatLabel}>Avg Bill</span>
+                        <span style={styles.utilityStatValue}>${fmt2(stats.avgAmount)}</span>
+                      </div>
+                      <div style={styles.utilityStat}>
+                        <span style={styles.utilityStatLabel}>Avg Days</span>
+                        <span style={styles.utilityStatValue}>{stats.avgDays.toFixed(1)}</span>
+                      </div>
+                      <div style={styles.utilityStat}>
+                        <span style={styles.utilityStatLabel}>Per Day</span>
+                        <span style={styles.utilityStatValue}>${fmt2(stats.perDay)}</span>
+                      </div>
+                      <div style={styles.utilityStat}>
+                        <span style={styles.utilityStatLabel}>Per Fortnight</span>
+                        <span style={styles.utilityStatValue}>${fmt2(stats.perFortnight)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -753,5 +819,63 @@ const styles: Record<string, React.CSSProperties> = {
     background: "var(--bg-page)",
     color: "var(--text-primary)",
     cursor: "pointer",
+  },
+  utilitiesCard: {
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "1rem 1.25rem",
+    marginBottom: "1.5rem",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  },
+  utilitiesCardHeader: {
+    marginBottom: "0.875rem",
+  },
+  utilitiesCardTitle: {
+    fontSize: "0.85rem",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: "var(--text-secondary)",
+  },
+  utilitiesGrid: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "1rem",
+  },
+  utilityItem: {
+    flex: "1 1 200px",
+    background: "var(--bg-page)",
+    border: "1px solid var(--border)",
+    borderRadius: "10px",
+    padding: "0.875rem 1rem",
+  },
+  utilityLabel: {
+    fontSize: "0.875rem",
+    fontWeight: 700,
+    color: "var(--text-primary)",
+    marginBottom: "0.625rem",
+  },
+  utilityStats: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "0.5rem",
+  },
+  utilityStat: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "0.15rem",
+  },
+  utilityStatLabel: {
+    fontSize: "0.7rem",
+    fontWeight: 600,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.04em",
+    color: "var(--text-secondary)",
+  },
+  utilityStatValue: {
+    fontSize: "0.9rem",
+    fontWeight: 600,
+    color: "var(--text-primary)",
   },
 };

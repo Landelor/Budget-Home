@@ -12,6 +12,7 @@ import { dashboardRoutes } from "./routes/dashboard.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { expenseRoutes } from "./routes/expenses.js";
 import { exchangeRateRoutes } from "./routes/exchangeRates.js";
+import { utilityRoutes } from "./routes/utilities.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -40,6 +41,7 @@ export async function buildApp() {
   await app.register(settingsRoutes);
   await app.register(expenseRoutes);
   await app.register(exchangeRateRoutes);
+  await app.register(utilityRoutes);
 
   return app;
 }

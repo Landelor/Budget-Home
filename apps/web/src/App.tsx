@@ -7,8 +7,9 @@ import { AccountsPage } from "./pages/AccountsPage.js";
 import { TransactionsPage } from "./pages/TransactionsPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { ExpensesPage } from "./pages/ExpensesPage.js";
+import { UtilitiesPage } from "./pages/UtilitiesPage.js";
 
-type Page = "dashboard" | "transactions" | "accounts" | "expenses" | "settings";
+type Page = "dashboard" | "transactions" | "accounts" | "expenses" | "utilities" | "settings";
 
 export function App() {
   const { isAuthenticated, loading, error, login, register, logout } = useAuth();
@@ -43,6 +44,12 @@ export function App() {
       )}
       {page === "expenses" && (
         <ExpensesPage
+          onLogout={logout}
+          onNavigate={(p) => setPage(p as Page)}
+        />
+      )}
+      {page === "utilities" && (
+        <UtilitiesPage
           onLogout={logout}
           onNavigate={(p) => setPage(p as Page)}
         />

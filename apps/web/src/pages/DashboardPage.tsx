@@ -65,6 +65,13 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
           <button
             style={styles.navBtn}
             type="button"
+            onClick={() => onNavigate("utilities")}
+          >
+            Utilities
+          </button>
+          <button
+            style={styles.navBtn}
+            type="button"
             onClick={() => onNavigate("settings")}
           >
             Settings

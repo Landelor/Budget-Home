@@ -63,6 +63,9 @@ export function SettingsPage({ onLogout, onNavigate }: Props) {
           <button style={styles.navBtn} type="button" onClick={() => onNavigate("expenses")}>
             Expenses
           </button>
+          <button style={styles.navBtn} type="button" onClick={() => onNavigate("utilities")}>
+            Utilities
+          </button>
           <button
             style={{ ...styles.navBtn, background: "rgba(255,255,255,0.12)", color: "#fff" }}
             type="button"
