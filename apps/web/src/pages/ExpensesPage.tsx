@@ -476,7 +476,7 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
               {/* Offset Amount card */}
               <div style={styles.offsetAmountCard}>
                 <div style={styles.offsetAmountLabel}>Offset Amount</div>
-                <div style={styles.offsetAmountValue}>{fmt(offsetTotalWeekly, defaultCurrency)}</div>
+                <div style={styles.offsetAmountValue}>{fmt(Math.ceil(offsetTotalWeekly / 10) * 10, defaultCurrency)}</div>
                 <div style={styles.offsetAmountSub}>per week</div>
               </div>
 
