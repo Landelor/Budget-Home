@@ -50,6 +50,13 @@
       "when": 1781833099103,
       "tag": "0006_date_format",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781933099103,
+      "tag": "0007_expenses",
+      "breakpoints": true
     }
   ]
 }

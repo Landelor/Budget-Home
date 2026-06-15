@@ -20,6 +20,12 @@ export const accountTypeEnum = pgEnum("account_type", [
 
 export const budgetPeriodEnum = pgEnum("budget_period", ["monthly", "weekly"]);
 
+export const expenseFrequencyEnum = pgEnum("expense_frequency", [
+  "fortnightly",
+  "monthly",
+  "yearly",
+]);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
@@ -91,6 +97,18 @@ export const budgets = pgTable("budgets", {
   deletedAt: timestamp("deleted_at"),
 });
 
+export const expenses = pgTable("expenses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  frequency: expenseFrequencyEnum("frequency").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
 export const refreshTokens = pgTable("refresh_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -108,6 +126,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   transactions: many(transactions),
   budgets: many(budgets),
   categories: many(categories),
+  expenses: many(expenses),
   refreshTokens: many(refreshTokens),
 }));
 
@@ -155,6 +174,10 @@ export const budgetsRelations = relations(budgets, ({ one }) => ({
   }),
 }));
 
+export const expensesRelations = relations(expenses, ({ one }) => ({
+  user: one(users, { fields: [expenses.userId], references: [users.id] }),
+}));
+
 // Inferred TypeScript types
 
 export type User = typeof users.$inferSelect;
@@ -171,6 +194,9 @@ export type NewTransaction = typeof transactions.$inferInsert;
 
 export type Budget = typeof budgets.$inferSelect;
 export type NewBudget = typeof budgets.$inferInsert;
+
+export type Expense = typeof expenses.$inferSelect;
+export type NewExpense = typeof expenses.$inferInsert;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;
