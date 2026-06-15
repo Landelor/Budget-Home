@@ -77,7 +77,10 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
   const [deleting, setDeleting] = useState<Expense | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("name-asc");
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    const saved = localStorage.getItem("expenses-sort-key");
+    return (saved as SortKey) ?? "name-asc";
+  });
 
   const [defaultCurrency, setDefaultCurrency] = useState("USD");
   const [rates, setRates] = useState<Record<string, number> | null>(null);
@@ -223,7 +226,11 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
               <select
                 style={styles.sortSelect}
                 value={sortKey}
-                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                onChange={(e) => {
+                  const key = e.target.value as SortKey;
+                  localStorage.setItem("expenses-sort-key", key);
+                  setSortKey(key);
+                }}
               >
                 <option value="name-asc">Name (A → Z)</option>
                 <option value="name-desc">Name (Z → A)</option>
