@@ -220,7 +220,8 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
     if (!exp) return 0;
     const expCurrency = exp.currency ?? defaultCurrency;
     const yearly = calcAmounts(exp.amount, exp.frequency).yearly;
-    return rates ? convertAmount(yearly, expCurrency, defaultCurrency, rates) : yearly;
+    const converted = rates ? convertAmount(yearly, expCurrency, defaultCurrency, rates) : yearly;
+    return Math.ceil(converted / 100) * 100;
   }
 
   const offsetTotalWeekly = offsetItems.reduce((sum, o) => {
@@ -480,7 +481,7 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
               </div>
 
               {/* Offset table */}
-              <div style={styles.tableWrap}>
+              <div style={styles.offsetTableWrap}>
                 <div style={styles.offsetTableHeader}>
                   <span style={styles.offsetTableTitle}>Offset</span>
                   <button
@@ -974,8 +975,15 @@ const styles: Record<string, React.CSSProperties> = {
     overflowX: "auto",
   },
   offsetColumn: {
-    flex: "0 0 360px",
-    minWidth: "280px",
+    flex: "0 0 460px",
+    minWidth: "340px",
+  },
+  offsetTableWrap: {
+    background: "var(--bg-card)",
+    borderRadius: "12px",
+    border: "1px solid var(--border)",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+    overflow: "hidden",
   },
   offsetAmountCard: {
     background: "var(--bg-card)",
