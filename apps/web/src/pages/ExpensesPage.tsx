@@ -65,6 +65,8 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: "", amount: "", frequency: "monthly", currency: "USD" };
 
+type SortKey = "name-asc" | "name-desc" | "amount-asc" | "amount-desc";
+
 export function ExpensesPage({ onLogout, onNavigate }: Props) {
   const { expenses, loading, error, add, edit, remove } = useExpenses();
   const { isDark, toggleTheme } = useTheme();
@@ -75,6 +77,7 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
   const [deleting, setDeleting] = useState<Expense | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("name-asc");
 
   const [defaultCurrency, setDefaultCurrency] = useState("USD");
   const [rates, setRates] = useState<Record<string, number> | null>(null);
@@ -166,6 +169,22 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
 
   const showRatesCard = foreignCurrencies.length > 0;
 
+  const sortedExpenses = [...expenses].sort((a, b) => {
+    if (sortKey === "name-asc") return a.name.localeCompare(b.name);
+    if (sortKey === "name-desc") return b.name.localeCompare(a.name);
+    const yearlyA = (() => {
+      const cur = a.currency ?? defaultCurrency;
+      const y = calcAmounts(a.amount, a.frequency).yearly;
+      return rates ? convertAmount(y, cur, defaultCurrency, rates) : y;
+    })();
+    const yearlyB = (() => {
+      const cur = b.currency ?? defaultCurrency;
+      const y = calcAmounts(b.amount, b.frequency).yearly;
+      return rates ? convertAmount(y, cur, defaultCurrency, rates) : y;
+    })();
+    return sortKey === "amount-desc" ? yearlyB - yearlyA : yearlyA - yearlyB;
+  });
+
   return (
     <div style={styles.page}>
       <header style={styles.header}>
@@ -198,9 +217,24 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
       <main style={styles.main}>
         <div style={styles.toolbar}>
           <h2 style={styles.pageTitle}>Expenses</h2>
-          <button style={styles.addBtn} type="button" onClick={openAdd}>
-            + Add Expense
-          </button>
+          <div style={styles.toolbarRight}>
+            <label style={styles.sortLabel}>
+              Sort by
+              <select
+                style={styles.sortSelect}
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+              >
+                <option value="name-asc">Name (A → Z)</option>
+                <option value="name-desc">Name (Z → A)</option>
+                <option value="amount-desc">Amount (Highest)</option>
+                <option value="amount-asc">Amount (Lowest)</option>
+              </select>
+            </label>
+            <button style={styles.addBtn} type="button" onClick={openAdd}>
+              + Add Expense
+            </button>
+          </div>
         </div>
 
         {showRatesCard && rates && (
@@ -255,7 +289,7 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {expenses.map((expense) => {
+                {sortedExpenses.map((expense) => {
                   const expCurrency = expense.currency ?? defaultCurrency;
                   const amounts = calcAmounts(expense.amount, expense.frequency);
                   const convert = (n: number) =>
@@ -690,5 +724,27 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: "0.9rem",
     fontWeight: 600,
+  },
+  toolbarRight: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.75rem",
+  },
+  sortLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    fontSize: "0.85rem",
+    fontWeight: 500,
+    color: "var(--text-secondary)",
+  },
+  sortSelect: {
+    padding: "0.4rem 0.6rem",
+    borderRadius: "7px",
+    border: "1px solid var(--border)",
+    fontSize: "0.85rem",
+    background: "var(--bg-page)",
+    color: "var(--text-primary)",
+    cursor: "pointer",
   },
 };
