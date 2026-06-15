@@ -189,7 +189,7 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
                 </thead>
                 <tbody>
                   {[...typeEntries]
-                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .sort((a, b) => a.date.localeCompare(b.date))
                     .map((u) => {
                       const perDay = parseFloat(u.amount) / u.serviceDays;
                       return (
