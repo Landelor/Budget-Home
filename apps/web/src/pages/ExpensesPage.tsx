@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useExpenses } from "../hooks/useExpenses.js";
 import { useTheme } from "../hooks/useTheme.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 import type { Expense, ExpenseFrequency } from "../api/expenses.js";
+import { getExchangeRates } from "../api/expenses.js";
+import { getSettings, SUPPORTED_CURRENCIES } from "../api/settings.js";
 
 const FREQUENCY_LABELS: Record<ExpenseFrequency, string> = {
   fortnightly: "Fortnightly",
@@ -27,13 +29,26 @@ function calcAmounts(amount: string, frequency: ExpenseFrequency) {
   };
 }
 
-function fmt(n: number): string {
+function fmt(n: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
+}
+
+function convertAmount(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string,
+  rates: Record<string, number>,
+): number {
+  if (fromCurrency === toCurrency) return amount;
+  const fromRate = rates[fromCurrency];
+  const toRate = rates[toCurrency];
+  if (!fromRate || !toRate) return amount;
+  return (amount / fromRate) * toRate;
 }
 
 interface Props {
@@ -45,9 +60,10 @@ interface FormState {
   name: string;
   amount: string;
   frequency: ExpenseFrequency;
+  currency: string;
 }
 
-const EMPTY_FORM: FormState = { name: "", amount: "", frequency: "monthly" };
+const EMPTY_FORM: FormState = { name: "", amount: "", frequency: "monthly", currency: "USD" };
 
 export function ExpensesPage({ onLogout, onNavigate }: Props) {
   const { expenses, loading, error, add, edit, remove } = useExpenses();
@@ -60,9 +76,32 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const [defaultCurrency, setDefaultCurrency] = useState("USD");
+  const [rates, setRates] = useState<Record<string, number> | null>(null);
+  const [ratesDate, setRatesDate] = useState<string | null>(null);
+  const [ratesError, setRatesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSettings()
+      .then((s) => {
+        setDefaultCurrency(s.defaultCurrency);
+        setForm((f) => ({ ...f, currency: s.defaultCurrency }));
+      })
+      .catch(() => {});
+
+    getExchangeRates()
+      .then(({ rates, date }) => {
+        setRates(rates);
+        setRatesDate(date);
+      })
+      .catch(() => {
+        setRatesError("Could not load exchange rates");
+      });
+  }, []);
+
   function openAdd() {
     setEditing(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, currency: defaultCurrency });
     setFormError(null);
     setShowForm(true);
   }
@@ -73,6 +112,7 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
       name: expense.name,
       amount: parseFloat(expense.amount).toString(),
       frequency: expense.frequency,
+      currency: expense.currency ?? defaultCurrency,
     });
     setFormError(null);
     setShowForm(true);
@@ -81,7 +121,7 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
   function closeForm() {
     setShowForm(false);
     setEditing(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, currency: defaultCurrency });
     setFormError(null);
   }
 
@@ -100,9 +140,9 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
     setFormError(null);
     try {
       if (editing) {
-        await edit(editing.id, form.name.trim(), amount, form.frequency);
+        await edit(editing.id, form.name.trim(), amount, form.frequency, form.currency);
       } else {
-        await add(form.name.trim(), amount, form.frequency);
+        await add(form.name.trim(), amount, form.frequency, form.currency);
       }
       closeForm();
     } catch (e) {
@@ -116,6 +156,15 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
     await remove(expense.id);
     setDeleting(null);
   }
+
+  // Currencies actually used in expenses (excluding default)
+  const foreignCurrencies = [...new Set(
+    expenses
+      .map((e) => e.currency ?? defaultCurrency)
+      .filter((c) => c !== defaultCurrency),
+  )];
+
+  const showRatesCard = foreignCurrencies.length > 0;
 
   return (
     <div style={styles.page}>
@@ -154,6 +203,37 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
           </button>
         </div>
 
+        {showRatesCard && rates && (
+          <div style={styles.ratesCard}>
+            <div style={styles.ratesCardHeader}>
+              <span style={styles.ratesCardTitle}>Exchange Rates</span>
+              {ratesDate && (
+                <span style={styles.ratesCardDate}>
+                  Rates as of {ratesDate} (base: {defaultCurrency})
+                </span>
+              )}
+            </div>
+            <div style={styles.ratesGrid}>
+              {foreignCurrencies.map((c) => {
+                const fromRate = rates[c];
+                const toRate = rates[defaultCurrency];
+                if (!fromRate || !toRate) return null;
+                const rate = toRate / fromRate;
+                return (
+                  <div key={c} style={styles.rateItem}>
+                    <span style={styles.rateCurrency}>{c}</span>
+                    <span style={styles.rateArrow}>→</span>
+                    <span style={styles.rateValue}>
+                      {rate.toFixed(4)} {defaultCurrency}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {ratesError && <p style={styles.ratesError}>{ratesError}</p>}
+          </div>
+        )}
+
         {loading && <p style={styles.status}>Loading…</p>}
         {error && <p style={styles.errorMsg}>{error}</p>}
 
@@ -168,29 +248,35 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
                 <tr>
                   <th style={styles.th}>Name</th>
                   <th style={styles.th}>Entered As</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Fortnightly</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Monthly</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Yearly</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Fortnightly ({defaultCurrency})</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Monthly ({defaultCurrency})</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Yearly ({defaultCurrency})</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {expenses.map((expense) => {
+                  const expCurrency = expense.currency ?? defaultCurrency;
                   const amounts = calcAmounts(expense.amount, expense.frequency);
+                  const convert = (n: number) =>
+                    rates ? convertAmount(n, expCurrency, defaultCurrency, rates) : n;
                   return (
                     <tr key={expense.id} style={styles.tr}>
                       <td style={styles.td}>{expense.name}</td>
                       <td style={styles.td}>
-                        {fmt(parseFloat(expense.amount))} / {FREQUENCY_LABELS[expense.frequency]}
+                        {fmt(parseFloat(expense.amount), expCurrency)} / {FREQUENCY_LABELS[expense.frequency]}
+                        {expCurrency !== defaultCurrency && (
+                          <span style={styles.currencyTag}>{expCurrency}</span>
+                        )}
                       </td>
                       <td style={{ ...styles.td, textAlign: "right" }}>
-                        {fmt(amounts.fortnightly)}
+                        {fmt(convert(amounts.fortnightly), defaultCurrency)}
                       </td>
                       <td style={{ ...styles.td, textAlign: "right" }}>
-                        {fmt(amounts.monthly)}
+                        {fmt(convert(amounts.monthly), defaultCurrency)}
                       </td>
                       <td style={{ ...styles.td, textAlign: "right" }}>
-                        {fmt(amounts.yearly)}
+                        {fmt(convert(amounts.yearly), defaultCurrency)}
                       </td>
                       <td style={{ ...styles.td, textAlign: "right" }}>
                         <button
@@ -249,19 +335,41 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
                 </select>
               </label>
 
-              <label style={styles.label}>
-                Amount ({FREQUENCY_LABELS[form.frequency]})
-                <input
-                  style={styles.input}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.amount}
-                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                  placeholder="0.00"
-                  required
-                />
-              </label>
+              <div style={styles.amountRow}>
+                <label style={{ ...styles.label, flex: 1 }}>
+                  Amount ({FREQUENCY_LABELS[form.frequency]})
+                  <input
+                    style={styles.input}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.amount}
+                    onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                    placeholder="0.00"
+                    required
+                  />
+                </label>
+                <label style={{ ...styles.label, width: "110px" }}>
+                  Currency
+                  <select
+                    style={styles.input}
+                    value={form.currency}
+                    onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+                  >
+                    {SUPPORTED_CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.code}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {form.currency !== defaultCurrency && rates && (
+                <p style={styles.conversionNote}>
+                  Amounts will be shown converted to {defaultCurrency} using live rates.
+                </p>
+              )}
 
               {formError && <p style={styles.formError}>{formError}</p>}
 
@@ -372,6 +480,61 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.9rem",
     fontWeight: 600,
   },
+  ratesCard: {
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "1rem 1.25rem",
+    marginBottom: "1.5rem",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  },
+  ratesCardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "0.75rem",
+  },
+  ratesCardTitle: {
+    fontSize: "0.85rem",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: "var(--text-secondary)",
+  },
+  ratesCardDate: {
+    fontSize: "0.75rem",
+    color: "var(--text-secondary)",
+  },
+  ratesGrid: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "0.75rem",
+  },
+  rateItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.4rem",
+    background: "var(--bg-page)",
+    border: "1px solid var(--border)",
+    borderRadius: "8px",
+    padding: "0.4rem 0.875rem",
+    fontSize: "0.875rem",
+  },
+  rateCurrency: {
+    fontWeight: 700,
+    color: "var(--text-primary)",
+  },
+  rateArrow: {
+    color: "var(--text-secondary)",
+  },
+  rateValue: {
+    color: "var(--text-primary)",
+  },
+  ratesError: {
+    color: "#dc2626",
+    fontSize: "0.8rem",
+    margin: "0.5rem 0 0",
+  },
   status: {
     color: "var(--text-secondary)",
     textAlign: "center",
@@ -421,6 +584,16 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-primary)",
     verticalAlign: "middle",
   },
+  currencyTag: {
+    display: "inline-block",
+    marginLeft: "0.4rem",
+    fontSize: "0.7rem",
+    fontWeight: 700,
+    background: "#dbeafe",
+    color: "#1d4ed8",
+    padding: "0.1rem 0.4rem",
+    borderRadius: "4px",
+  },
   actionBtn: {
     background: "transparent",
     border: "1px solid var(--border)",
@@ -449,7 +622,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "12px",
     padding: "2rem",
     width: "100%",
-    maxWidth: "420px",
+    maxWidth: "440px",
     boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
   },
   modalTitle: {
@@ -477,6 +650,16 @@ const styles: Record<string, React.CSSProperties> = {
     outline: "none",
     width: "100%",
     boxSizing: "border-box",
+  },
+  amountRow: {
+    display: "flex",
+    gap: "0.75rem",
+    alignItems: "flex-start",
+  },
+  conversionNote: {
+    fontSize: "0.8rem",
+    color: "#2563eb",
+    margin: "-0.25rem 0 0.75rem",
   },
   formError: {
     color: "#dc2626",

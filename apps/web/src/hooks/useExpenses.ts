@@ -36,16 +36,16 @@ export function useExpenses() {
   }, [refresh]);
 
   const add = useCallback(
-    async (name: string, amount: number, frequency: ExpenseFrequency) => {
-      const expense = await createExpense({ name, amount, frequency });
+    async (name: string, amount: number, frequency: ExpenseFrequency, currency: string) => {
+      const expense = await createExpense({ name, amount, frequency, currency });
       setState((s) => ({ ...s, expenses: [...s.expenses, expense] }));
     },
     [],
   );
 
   const edit = useCallback(
-    async (id: string, name: string, amount: number, frequency: ExpenseFrequency) => {
-      const updated = await updateExpense(id, { name, amount, frequency });
+    async (id: string, name: string, amount: number, frequency: ExpenseFrequency, currency: string) => {
+      const updated = await updateExpense(id, { name, amount, frequency, currency });
       setState((s) => ({
         ...s,
         expenses: s.expenses.map((e) => (e.id === id ? updated : e)),

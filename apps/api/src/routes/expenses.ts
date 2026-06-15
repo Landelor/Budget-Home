@@ -5,6 +5,11 @@ import { authenticate } from "../middleware/authenticate.js";
 
 type ExpenseFrequency = "fortnightly" | "monthly" | "yearly";
 
+const SUPPORTED_CURRENCIES = [
+  "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR", "BRL",
+  "MXN", "SGD", "HKD", "NOK", "SEK", "DKK", "NZD", "ZAR", "KRW", "TRY",
+];
+
 export async function expenseRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
@@ -18,7 +23,7 @@ export async function expenseRoutes(app: FastifyInstance): Promise<void> {
     },
   });
 
-  app.post<{ Body: { name: string; amount: number; frequency: ExpenseFrequency } }>(
+  app.post<{ Body: { name: string; amount: number; frequency: ExpenseFrequency; currency?: string } }>(
     "/expenses",
     {
       schema: {
@@ -30,17 +35,19 @@ export async function expenseRoutes(app: FastifyInstance): Promise<void> {
             name: { type: "string", minLength: 1, maxLength: 100 },
             amount: { type: "number", minimum: 0 },
             frequency: { type: "string", enum: ["fortnightly", "monthly", "yearly"] },
+            currency: { type: "string", minLength: 3, maxLength: 3, enum: SUPPORTED_CURRENCIES },
           },
         },
       },
       handler: async (request, reply) => {
-        const { name, amount, frequency } = request.body;
+        const { name, amount, frequency, currency = "USD" } = request.body;
         const [expense] = await db
           .insert(expenses)
           .values({
             userId: request.user.id,
             name,
             amount: amount.toFixed(2),
+            currency,
             frequency,
           })
           .returning();
@@ -51,7 +58,7 @@ export async function expenseRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: { name?: string; amount?: number; frequency?: ExpenseFrequency };
+    Body: { name?: string; amount?: number; frequency?: ExpenseFrequency; currency?: string };
   }>("/expenses/:id", {
     schema: {
       params: {
@@ -66,6 +73,7 @@ export async function expenseRoutes(app: FastifyInstance): Promise<void> {
           name: { type: "string", minLength: 1, maxLength: 100 },
           amount: { type: "number", minimum: 0 },
           frequency: { type: "string", enum: ["fortnightly", "monthly", "yearly"] },
+          currency: { type: "string", minLength: 3, maxLength: 3, enum: SUPPORTED_CURRENCIES },
         },
       },
     },
@@ -86,10 +94,11 @@ export async function expenseRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({ error: "forbidden", message: "Access denied" });
       }
 
-      const updates: { name?: string; amount?: string; frequency?: ExpenseFrequency } = {};
+      const updates: { name?: string; amount?: string; frequency?: ExpenseFrequency; currency?: string } = {};
       if (body.name !== undefined) updates.name = body.name;
       if (body.amount !== undefined) updates.amount = body.amount.toFixed(2);
       if (body.frequency !== undefined) updates.frequency = body.frequency;
+      if (body.currency !== undefined) updates.currency = body.currency;
 
       if (Object.keys(updates).length === 0) {
         return reply.send(existing);

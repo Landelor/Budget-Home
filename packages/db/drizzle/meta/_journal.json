@@ -57,6 +57,13 @@
       "when": 1781933099103,
       "tag": "0007_expenses",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782033099103,
+      "tag": "0008_expense_currency",
+      "breakpoints": true
     }
   ]
 }
