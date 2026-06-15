@@ -19,6 +19,7 @@ export interface Budget {
 export interface DashboardSummary {
   totalBalance: string;
   totalSpentThisMonth: string;
+  totalIncomeThisMonth: string;
 }
 
 export function listBudgets(): Promise<Budget[]> {

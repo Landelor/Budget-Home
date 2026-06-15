@@ -25,6 +25,12 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
               ELSE 0
             END
           ), 0)::text`,
+          totalIncomeThisMonth: sql<string>`COALESCE(SUM(
+            CASE WHEN ${transactions.amount}::numeric > 0
+              THEN ${transactions.amount}::numeric
+              ELSE 0
+            END
+          ), 0)::text`,
         })
         .from(transactions)
         .where(
@@ -39,6 +45,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       return reply.send({
         totalBalance: balanceRow?.totalBalance ?? "0",
         totalSpentThisMonth: spendRow?.totalSpentThisMonth ?? "0",
+        totalIncomeThisMonth: spendRow?.totalIncomeThisMonth ?? "0",
       });
     },
   });

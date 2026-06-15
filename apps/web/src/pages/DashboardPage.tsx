@@ -89,6 +89,12 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
                 {summary ? fmt(summary.totalSpentThisMonth) : "—"}
               </p>
             </div>
+            <div style={styles.summaryCard}>
+              <p style={styles.summaryLabel}>Income this month</p>
+              <p style={{ ...styles.summaryValue, color: "#16a34a" }}>
+                {summary ? fmt(summary.totalIncomeThisMonth) : "—"}
+              </p>
+            </div>
           </div>
         )}
       </main>
