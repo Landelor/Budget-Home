@@ -14,6 +14,24 @@ const FREQUENCY_LABELS: Record<ExpenseFrequency, string> = {
   yearly: "Yearly",
 };
 
+interface OffsetItem {
+  id: string;
+  expenseId: string;
+}
+
+function loadOffsetItems(): OffsetItem[] {
+  try {
+    const raw = localStorage.getItem("expenses-offset-items");
+    return raw ? (JSON.parse(raw) as OffsetItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOffsetItems(items: OffsetItem[]) {
+  localStorage.setItem("expenses-offset-items", JSON.stringify(items));
+}
+
 function calcAmounts(amount: string, frequency: ExpenseFrequency) {
   const n = parseFloat(amount);
   let yearly: number;
@@ -98,6 +116,9 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
   const [ratesDate, setRatesDate] = useState<string | null>(null);
   const [ratesError, setRatesError] = useState<string | null>(null);
   const [utilityEntries, setUtilityEntries] = useState<Utility[]>([]);
+  const [offsetItems, setOffsetItems] = useState<OffsetItem[]>(loadOffsetItems);
+  const [showOffsetSelect, setShowOffsetSelect] = useState(false);
+  const [offsetSelectId, setOffsetSelectId] = useState<string>("");
 
   useEffect(() => {
     getSettings()
@@ -178,6 +199,34 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
     await remove(expense.id);
     setDeleting(null);
   }
+
+  function addOffsetItem() {
+    if (!offsetSelectId) return;
+    const newItems = [...offsetItems, { id: `${Date.now()}-${Math.random()}`, expenseId: offsetSelectId }];
+    setOffsetItems(newItems);
+    saveOffsetItems(newItems);
+    setOffsetSelectId("");
+    setShowOffsetSelect(false);
+  }
+
+  function removeOffsetItem(id: string) {
+    const newItems = offsetItems.filter((o) => o.id !== id);
+    setOffsetItems(newItems);
+    saveOffsetItems(newItems);
+  }
+
+  function getOffsetYearly(expenseId: string): number {
+    const exp = expenses.find((e) => e.id === expenseId);
+    if (!exp) return 0;
+    const expCurrency = exp.currency ?? defaultCurrency;
+    const yearly = calcAmounts(exp.amount, exp.frequency).yearly;
+    return rates ? convertAmount(yearly, expCurrency, defaultCurrency, rates) : yearly;
+  }
+
+  const offsetTotalWeekly = offsetItems.reduce((sum, o) => {
+    const yearly = getOffsetYearly(o.expenseId);
+    return sum + yearly / 52;
+  }, 0);
 
   // Utility averages per type, amounts converted to default currency
   function utilityStats(type: UtilityType) {
@@ -358,63 +407,148 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
         )}
 
         {!loading && expenses.length > 0 && (
-          <div style={styles.tableWrap}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Entered As</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Fortnightly ({defaultCurrency})</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Monthly ({defaultCurrency})</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Yearly ({defaultCurrency})</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedExpenses.map((expense) => {
-                  const expCurrency = expense.currency ?? defaultCurrency;
-                  const amounts = calcAmounts(expense.amount, expense.frequency);
-                  const convert = (n: number) =>
-                    rates ? convertAmount(n, expCurrency, defaultCurrency, rates) : n;
-                  return (
-                    <tr key={expense.id} style={styles.tr}>
-                      <td style={styles.td}>{expense.name}</td>
-                      <td style={styles.td}>
-                        {fmt(parseFloat(expense.amount), expCurrency)} / {FREQUENCY_LABELS[expense.frequency]}
-                        {expCurrency !== defaultCurrency && (
-                          <span style={styles.currencyTag}>{expCurrency}</span>
-                        )}
-                      </td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>
-                        {fmt(convert(amounts.fortnightly), defaultCurrency)}
-                      </td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>
-                        {fmt(convert(amounts.monthly), defaultCurrency)}
-                      </td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>
-                        {fmt(convert(amounts.yearly), defaultCurrency)}
-                      </td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>
-                        <button
-                          style={styles.actionBtn}
-                          type="button"
-                          onClick={() => openEdit(expense)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          style={{ ...styles.actionBtn, ...styles.deleteBtn }}
-                          type="button"
-                          onClick={() => setDeleting(expense)}
-                        >
-                          Delete
-                        </button>
-                      </td>
+          <div style={styles.columnsLayout}>
+            {/* Expenses table */}
+            <div style={styles.expensesColumn}>
+              <div style={styles.tableWrap}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Name</th>
+                      <th style={styles.th}>Entered As</th>
+                      <th style={{ ...styles.th, textAlign: "right" }}>Fortnightly ({defaultCurrency})</th>
+                      <th style={{ ...styles.th, textAlign: "right" }}>Monthly ({defaultCurrency})</th>
+                      <th style={{ ...styles.th, textAlign: "right" }}>Yearly ({defaultCurrency})</th>
+                      <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {sortedExpenses.map((expense) => {
+                      const expCurrency = expense.currency ?? defaultCurrency;
+                      const amounts = calcAmounts(expense.amount, expense.frequency);
+                      const convert = (n: number) =>
+                        rates ? convertAmount(n, expCurrency, defaultCurrency, rates) : n;
+                      return (
+                        <tr key={expense.id} style={styles.tr}>
+                          <td style={styles.td}>{expense.name}</td>
+                          <td style={styles.td}>
+                            {fmt(parseFloat(expense.amount), expCurrency)} / {FREQUENCY_LABELS[expense.frequency]}
+                            {expCurrency !== defaultCurrency && (
+                              <span style={styles.currencyTag}>{expCurrency}</span>
+                            )}
+                          </td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>
+                            {fmt(convert(amounts.fortnightly), defaultCurrency)}
+                          </td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>
+                            {fmt(convert(amounts.monthly), defaultCurrency)}
+                          </td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>
+                            {fmt(convert(amounts.yearly), defaultCurrency)}
+                          </td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>
+                            <button
+                              style={styles.actionBtn}
+                              type="button"
+                              onClick={() => openEdit(expense)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              style={{ ...styles.actionBtn, ...styles.deleteBtn }}
+                              type="button"
+                              onClick={() => setDeleting(expense)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Offset panel */}
+            <div style={styles.offsetColumn}>
+              {/* Offset Amount card */}
+              <div style={styles.offsetAmountCard}>
+                <div style={styles.offsetAmountLabel}>Offset Amount</div>
+                <div style={styles.offsetAmountValue}>{fmt(offsetTotalWeekly, defaultCurrency)}</div>
+                <div style={styles.offsetAmountSub}>per week</div>
+              </div>
+
+              {/* Offset table */}
+              <div style={styles.tableWrap}>
+                <div style={styles.offsetTableHeader}>
+                  <span style={styles.offsetTableTitle}>Offset</span>
+                  <button
+                    style={styles.addBtn}
+                    type="button"
+                    onClick={() => { setShowOffsetSelect(true); setOffsetSelectId(sortedExpenses[0]?.id ?? ""); }}
+                  >
+                    + Add
+                  </button>
+                </div>
+                {showOffsetSelect && (
+                  <div style={styles.offsetSelectRow}>
+                    <select
+                      style={styles.offsetSelect}
+                      value={offsetSelectId}
+                      onChange={(e) => setOffsetSelectId(e.target.value)}
+                    >
+                      {sortedExpenses.map((exp) => (
+                        <option key={exp.id} value={exp.id}>{exp.name}</option>
+                      ))}
+                    </select>
+                    <button style={styles.submitBtn} type="button" onClick={addOffsetItem}>Add</button>
+                    <button style={styles.cancelBtn} type="button" onClick={() => setShowOffsetSelect(false)}>Cancel</button>
+                  </div>
+                )}
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Expense</th>
+                      <th style={{ ...styles.th, textAlign: "right" }}>Yearly</th>
+                      <th style={{ ...styles.th, textAlign: "right" }}>Weekly</th>
+                      <th style={{ ...styles.th, textAlign: "right" }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {offsetItems.length === 0 && (
+                      <tr>
+                        <td colSpan={4} style={{ ...styles.td, textAlign: "center", color: "var(--text-secondary)", fontSize: "0.85rem" }}>
+                          No items. Click + Add to select an expense.
+                        </td>
+                      </tr>
+                    )}
+                    {offsetItems.map((item) => {
+                      const exp = expenses.find((e) => e.id === item.expenseId);
+                      if (!exp) return null;
+                      const yearly = getOffsetYearly(item.expenseId);
+                      const weekly = yearly / 52;
+                      return (
+                        <tr key={item.id} style={styles.tr}>
+                          <td style={styles.td}>{exp.name}</td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>{fmt(yearly, defaultCurrency)}</td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>{fmt(weekly, defaultCurrency)}</td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>
+                            <button
+                              style={{ ...styles.actionBtn, ...styles.deleteBtn }}
+                              type="button"
+                              onClick={() => removeOffsetItem(item.id)}
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </main>
@@ -570,7 +704,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.875rem",
   },
   main: {
-    maxWidth: "1100px",
+    maxWidth: "1400px",
     margin: "0 auto",
     padding: "2rem 1.5rem",
   },
@@ -828,6 +962,79 @@ const styles: Record<string, React.CSSProperties> = {
     background: "var(--bg-page)",
     color: "var(--text-primary)",
     cursor: "pointer",
+  },
+  columnsLayout: {
+    display: "flex",
+    gap: "1.5rem",
+    alignItems: "flex-start",
+  },
+  expensesColumn: {
+    flex: "1 1 0",
+    minWidth: 0,
+    overflowX: "auto",
+  },
+  offsetColumn: {
+    flex: "0 0 360px",
+    minWidth: "280px",
+  },
+  offsetAmountCard: {
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "1rem 1.25rem",
+    marginBottom: "1rem",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+    textAlign: "center",
+  },
+  offsetAmountLabel: {
+    fontSize: "0.75rem",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: "var(--text-secondary)",
+    marginBottom: "0.25rem",
+  },
+  offsetAmountValue: {
+    fontSize: "1.6rem",
+    fontWeight: 700,
+    color: "var(--text-primary)",
+  },
+  offsetAmountSub: {
+    fontSize: "0.75rem",
+    color: "var(--text-secondary)",
+    marginTop: "0.15rem",
+  },
+  offsetTableHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "0.75rem 1rem 0",
+  },
+  offsetTableTitle: {
+    fontSize: "0.85rem",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: "var(--text-secondary)",
+  },
+  offsetSelectRow: {
+    display: "flex",
+    gap: "0.5rem",
+    alignItems: "center",
+    padding: "0.75rem 1rem",
+    borderBottom: "1px solid var(--border)",
+    flexWrap: "wrap" as const,
+  },
+  offsetSelect: {
+    flex: 1,
+    padding: "0.4rem 0.6rem",
+    borderRadius: "7px",
+    border: "1px solid var(--border)",
+    fontSize: "0.85rem",
+    background: "var(--bg-page)",
+    color: "var(--text-primary)",
+    cursor: "pointer",
+    minWidth: 0,
   },
   utilitiesCard: {
     background: "var(--bg-card)",
