@@ -40,8 +40,13 @@ function fmt(n: number, currency: string): string {
   }).format(n);
 }
 
-function fmt2(n: number): string {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmt2(n: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
 }
 
 function convertAmount(
@@ -323,7 +328,7 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
                     <div style={styles.utilityStats}>
                       <div style={styles.utilityStat}>
                         <span style={styles.utilityStatLabel}>Avg Bill</span>
-                        <span style={styles.utilityStatValue}>${fmt2(stats.avgAmount)}</span>
+                        <span style={styles.utilityStatValue}>{fmt2(stats.avgAmount, defaultCurrency)}</span>
                       </div>
                       <div style={styles.utilityStat}>
                         <span style={styles.utilityStatLabel}>Avg Days</span>
@@ -331,11 +336,11 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
                       </div>
                       <div style={styles.utilityStat}>
                         <span style={styles.utilityStatLabel}>Per Day</span>
-                        <span style={styles.utilityStatValue}>${fmt2(stats.perDay)}</span>
+                        <span style={styles.utilityStatValue}>{fmt2(stats.perDay, defaultCurrency)}</span>
                       </div>
                       <div style={styles.utilityStat}>
                         <span style={styles.utilityStatLabel}>Per Fortnight</span>
-                        <span style={styles.utilityStatValue}>${fmt2(stats.perFortnight)}</span>
+                        <span style={styles.utilityStatValue}>{fmt2(stats.perFortnight, defaultCurrency)}</span>
                       </div>
                     </div>
                   </div>

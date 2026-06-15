@@ -27,8 +27,13 @@ function convertAmount(
   return (amount / fromRate) * toRate;
 }
 
-function fmt(n: number): string {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmt(n: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
 }
 
 interface Props {
@@ -190,9 +195,9 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
                 <thead>
                   <tr>
                     <th style={styles.th}>Date</th>
-                    <th style={{ ...styles.th, textAlign: "right" }}>Amount ({defaultCurrency})</th>
+                    <th style={{ ...styles.th, textAlign: "right" }}>Amount</th>
                     <th style={{ ...styles.th, textAlign: "right" }}>Service Days</th>
-                    <th style={{ ...styles.th, textAlign: "right" }}>Per Day ({defaultCurrency})</th>
+                    <th style={{ ...styles.th, textAlign: "right" }}>Per Day</th>
                     <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
                   </tr>
                 </thead>
@@ -206,13 +211,13 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
                         <tr key={u.id} style={styles.tr}>
                           <td style={styles.td}>{u.date}</td>
                           <td style={{ ...styles.td, textAlign: "right" }}>
-                            {fmt(converted)}
+                            {fmt(converted, defaultCurrency)}
                             {(u.currency ?? defaultCurrency) !== defaultCurrency && (
                               <span style={styles.currencyTag}>{u.currency}</span>
                             )}
                           </td>
                           <td style={{ ...styles.td, textAlign: "right" }}>{u.serviceDays}</td>
-                          <td style={{ ...styles.td, textAlign: "right" }}>{fmt(perDay)}</td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>{fmt(perDay, defaultCurrency)}</td>
                           <td style={{ ...styles.td, textAlign: "right" }}>
                             <button style={styles.actionBtn} type="button" onClick={() => openEdit(u)}>Edit</button>
                             <button
