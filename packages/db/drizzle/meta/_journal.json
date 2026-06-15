@@ -71,6 +71,13 @@
       "when": 1782133099103,
       "tag": "0009_utilities",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782233099103,
+      "tag": "0010_utility_currency",
+      "breakpoints": true
     }
   ]
 }

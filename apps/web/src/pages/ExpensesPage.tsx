@@ -174,11 +174,15 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
     setDeleting(null);
   }
 
-  // Utility averages per type
+  // Utility averages per type, amounts converted to default currency
   function utilityStats(type: UtilityType) {
     const rows = utilityEntries.filter((u) => u.type === type);
     if (rows.length === 0) return null;
-    const avgAmount = rows.reduce((s, u) => s + parseFloat(u.amount), 0) / rows.length;
+    const avgAmount = rows.reduce((s, u) => {
+      const raw = parseFloat(u.amount);
+      const cur = u.currency ?? defaultCurrency;
+      return s + (rates ? convertAmount(raw, cur, defaultCurrency, rates) : raw);
+    }, 0) / rows.length;
     const avgDays = rows.reduce((s, u) => s + u.serviceDays, 0) / rows.length;
     const perDay = avgAmount / avgDays;
     const perFortnight = perDay * 14;

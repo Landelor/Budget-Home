@@ -121,6 +121,7 @@ export const utilities = pgTable("utilities", {
   type: utilityTypeEnum("type").notNull(),
   date: date("date").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
   serviceDays: integer("service_days").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   deletedAt: timestamp("deleted_at"),

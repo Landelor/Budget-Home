@@ -36,16 +36,16 @@ export function useUtilities() {
   }, [refresh]);
 
   const add = useCallback(
-    async (type: UtilityType, date: string, amount: number, serviceDays: number) => {
-      const utility = await createUtility({ type, date, amount, serviceDays });
+    async (type: UtilityType, date: string, amount: number, serviceDays: number, currency: string) => {
+      const utility = await createUtility({ type, date, amount, serviceDays, currency });
       setState((s) => ({ ...s, utilities: [...s.utilities, utility] }));
     },
     [],
   );
 
   const edit = useCallback(
-    async (id: string, date: string, amount: number, serviceDays: number) => {
-      const updated = await updateUtility(id, { date, amount, serviceDays });
+    async (id: string, date: string, amount: number, serviceDays: number, currency: string) => {
+      const updated = await updateUtility(id, { date, amount, serviceDays, currency });
       setState((s) => ({
         ...s,
         utilities: s.utilities.map((u) => (u.id === id ? updated : u)),

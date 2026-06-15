@@ -8,6 +8,7 @@ export interface Utility {
   type: UtilityType;
   date: string;
   amount: string;
+  currency: string;
   serviceDays: number;
   createdAt: string;
 }
@@ -21,6 +22,7 @@ export function createUtility(body: {
   date: string;
   amount: number;
   serviceDays: number;
+  currency: string;
 }): Promise<Utility> {
   return apiFetch<Utility>("/utilities", {
     method: "POST",
@@ -30,7 +32,7 @@ export function createUtility(body: {
 
 export function updateUtility(
   id: string,
-  body: { date?: string; amount?: number; serviceDays?: number },
+  body: { date?: string; amount?: number; serviceDays?: number; currency?: string },
 ): Promise<Utility> {
   return apiFetch<Utility>(`/utilities/${id}`, {
     method: "PATCH",

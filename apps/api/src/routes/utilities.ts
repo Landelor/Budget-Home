@@ -5,6 +5,11 @@ import { authenticate } from "../middleware/authenticate.js";
 
 type UtilityType = "gas" | "power" | "water";
 
+const SUPPORTED_CURRENCIES = [
+  "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR", "BRL",
+  "MXN", "SGD", "HKD", "NOK", "SEK", "DKK", "NZD", "ZAR", "KRW", "TRY",
+];
+
 export async function utilityRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
@@ -18,7 +23,7 @@ export async function utilityRoutes(app: FastifyInstance): Promise<void> {
     },
   });
 
-  app.post<{ Body: { type: UtilityType; date: string; amount: number; serviceDays: number } }>(
+  app.post<{ Body: { type: UtilityType; date: string; amount: number; serviceDays: number; currency?: string } }>(
     "/utilities",
     {
       schema: {
@@ -31,11 +36,12 @@ export async function utilityRoutes(app: FastifyInstance): Promise<void> {
             date: { type: "string", format: "date" },
             amount: { type: "number", minimum: 0 },
             serviceDays: { type: "integer", minimum: 1 },
+            currency: { type: "string", minLength: 3, maxLength: 3, enum: SUPPORTED_CURRENCIES },
           },
         },
       },
       handler: async (request, reply) => {
-        const { type, date, amount, serviceDays } = request.body;
+        const { type, date, amount, serviceDays, currency = "USD" } = request.body;
         const [utility] = await db
           .insert(utilities)
           .values({
@@ -43,6 +49,7 @@ export async function utilityRoutes(app: FastifyInstance): Promise<void> {
             type,
             date,
             amount: amount.toFixed(2),
+            currency,
             serviceDays,
           })
           .returning();
@@ -53,7 +60,7 @@ export async function utilityRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: { date?: string; amount?: number; serviceDays?: number };
+    Body: { date?: string; amount?: number; serviceDays?: number; currency?: string };
   }>("/utilities/:id", {
     schema: {
       params: {
@@ -68,6 +75,7 @@ export async function utilityRoutes(app: FastifyInstance): Promise<void> {
           date: { type: "string", format: "date" },
           amount: { type: "number", minimum: 0 },
           serviceDays: { type: "integer", minimum: 1 },
+          currency: { type: "string", minLength: 3, maxLength: 3, enum: SUPPORTED_CURRENCIES },
         },
       },
     },
@@ -88,10 +96,11 @@ export async function utilityRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({ error: "forbidden", message: "Access denied" });
       }
 
-      const updates: { date?: string; amount?: string; serviceDays?: number } = {};
+      const updates: { date?: string; amount?: string; serviceDays?: number; currency?: string } = {};
       if (body.date !== undefined) updates.date = body.date;
       if (body.amount !== undefined) updates.amount = body.amount.toFixed(2);
       if (body.serviceDays !== undefined) updates.serviceDays = body.serviceDays;
+      if (body.currency !== undefined) updates.currency = body.currency;
 
       if (Object.keys(updates).length === 0) {
         return reply.send(existing);
