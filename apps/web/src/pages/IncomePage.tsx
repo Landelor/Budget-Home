@@ -47,17 +47,22 @@ interface Props {
   onNavigate: (page: string) => void;
 }
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 interface FormState {
   name: string;
+  date: string;
   amount: string;
   frequency: IncomeFrequency;
   currency: string;
   personId: string;
 }
 
-const EMPTY_FORM: FormState = { name: "", amount: "", frequency: "monthly", currency: "USD", personId: "" };
+const EMPTY_FORM: FormState = { name: "", date: todayISO(), amount: "", frequency: "monthly", currency: "USD", personId: "" };
 
-type SortKey = "name-asc" | "name-desc" | "amount-asc" | "amount-desc" | "person-asc";
+type SortKey = "name-asc" | "name-desc" | "amount-asc" | "amount-desc" | "person-asc" | "date-desc" | "date-asc";
 
 export function IncomePage({ onLogout, onNavigate }: Props) {
   const { incomes, persons, loading, error, add, edit, remove, addPerson, removePerson } = useIncome();
@@ -99,7 +104,7 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
 
   function openAdd() {
     setEditing(null);
-    setForm({ ...EMPTY_FORM, currency: defaultCurrency });
+    setForm({ ...EMPTY_FORM, date: todayISO(), currency: defaultCurrency });
     setFormError(null);
     setShowForm(true);
   }
@@ -108,6 +113,7 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
     setEditing(income);
     setForm({
       name: income.name,
+      date: income.date,
       amount: parseFloat(income.amount).toString(),
       frequency: income.frequency,
       currency: income.currency ?? defaultCurrency,
@@ -120,7 +126,7 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
   function closeForm() {
     setShowForm(false);
     setEditing(null);
-    setForm({ ...EMPTY_FORM, currency: defaultCurrency });
+    setForm({ ...EMPTY_FORM, date: todayISO(), currency: defaultCurrency });
     setFormError(null);
   }
 
@@ -128,15 +134,16 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
     e.preventDefault();
     const amount = parseFloat(form.amount);
     if (!form.name.trim()) { setFormError("Name is required."); return; }
+    if (!form.date) { setFormError("Date is required."); return; }
     if (isNaN(amount) || amount < 0) { setFormError("Amount must be a non-negative number."); return; }
     setSubmitting(true);
     setFormError(null);
     try {
       const personId = form.personId || undefined;
       if (editing) {
-        await edit(editing.id, form.name.trim(), amount, form.frequency, form.currency, personId ?? null);
+        await edit(editing.id, form.name.trim(), form.date, amount, form.frequency, form.currency, personId ?? null);
       } else {
-        await add(form.name.trim(), amount, form.frequency, form.currency, personId);
+        await add(form.name.trim(), form.date, amount, form.frequency, form.currency, personId);
       }
       closeForm();
     } catch (e) {
@@ -165,6 +172,8 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
   const personMap = Object.fromEntries(persons.map((p) => [p.id, p.name]));
 
   const sortedIncomes = [...incomes].sort((a, b) => {
+    if (sortKey === "date-desc") return b.date.localeCompare(a.date);
+    if (sortKey === "date-asc") return a.date.localeCompare(b.date);
     if (sortKey === "person-asc") {
       const pA = a.personId ? (personMap[a.personId] ?? "") : "";
       const pB = b.personId ? (personMap[b.personId] ?? "") : "";
@@ -207,6 +216,8 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                   setSortKey(key);
                 }}
               >
+                <option value="date-desc">Date (Newest)</option>
+                <option value="date-asc">Date (Oldest)</option>
                 <option value="name-asc">Name (A → Z)</option>
                 <option value="name-desc">Name (Z → A)</option>
                 <option value="amount-desc">Amount (Highest)</option>
@@ -232,6 +243,7 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
             <table style={styles.table}>
               <thead>
                 <tr>
+                  <th style={styles.th}>Date</th>
                   <th style={styles.th}>Person</th>
                   <th style={styles.th}>Name</th>
                   <th style={styles.th}>Entered As</th>
@@ -248,6 +260,7 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                   const convert = (n: number) => (rates ? convertAmount(n, cur, defaultCurrency, rates) : n);
                   return (
                     <tr key={income.id} style={styles.tr}>
+                      <td style={styles.td}>{income.date}</td>
                       <td style={styles.td}>
                         {income.personId ? (
                           <span style={styles.personTag}>{personMap[income.personId] ?? "—"}</span>
@@ -310,6 +323,17 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="e.g. Salary, Freelance"
+                  required
+                />
+              </label>
+
+              <label style={styles.label}>
+                Date
+                <input
+                  style={styles.input}
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
                   required
                 />
               </label>

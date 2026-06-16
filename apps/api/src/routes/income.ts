@@ -118,15 +118,16 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{
-    Body: { name: string; amount: number; frequency: IncomeFrequency; currency?: string; personId?: string };
+    Body: { name: string; date: string; amount: number; frequency: IncomeFrequency; currency?: string; personId?: string };
   }>("/income", {
     schema: {
       body: {
         type: "object",
-        required: ["name", "amount", "frequency"],
+        required: ["name", "date", "amount", "frequency"],
         additionalProperties: false,
         properties: {
           name: { type: "string", minLength: 1, maxLength: 100 },
+          date: { type: "string", format: "date" },
           amount: { type: "number", minimum: 0 },
           frequency: { type: "string", enum: ["fortnightly", "monthly", "yearly"] },
           currency: { type: "string", minLength: 3, maxLength: 3, enum: SUPPORTED_CURRENCIES },
@@ -135,7 +136,7 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     handler: async (request, reply) => {
-      const { name, amount, frequency, currency = "USD", personId } = request.body;
+      const { name, date, amount, frequency, currency = "USD", personId } = request.body;
 
       if (personId) {
         const [person] = await db
@@ -148,7 +149,7 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
 
       const [income] = await db
         .insert(incomes)
-        .values({ userId: request.user.id, name, amount: amount.toFixed(2), currency, frequency, personId: personId ?? null })
+        .values({ userId: request.user.id, name, date, amount: amount.toFixed(2), currency, frequency, personId: personId ?? null })
         .returning();
       return reply.status(201).send(income);
     },
@@ -156,7 +157,7 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{
     Params: { id: string };
-    Body: { name?: string; amount?: number; frequency?: IncomeFrequency; currency?: string; personId?: string | null };
+    Body: { name?: string; date?: string; amount?: number; frequency?: IncomeFrequency; currency?: string; personId?: string | null };
   }>("/income/:id", {
     schema: {
       params: {
@@ -169,6 +170,7 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
         additionalProperties: false,
         properties: {
           name: { type: "string", minLength: 1, maxLength: 100 },
+          date: { type: "string", format: "date" },
           amount: { type: "number", minimum: 0 },
           frequency: { type: "string", enum: ["fortnightly", "monthly", "yearly"] },
           currency: { type: "string", minLength: 3, maxLength: 3, enum: SUPPORTED_CURRENCIES },
@@ -190,6 +192,7 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
 
       const updates: Record<string, unknown> = {};
       if (body.name !== undefined) updates.name = body.name;
+      if (body.date !== undefined) updates.date = body.date;
       if (body.amount !== undefined) updates.amount = body.amount.toFixed(2);
       if (body.frequency !== undefined) updates.frequency = body.frequency;
       if (body.currency !== undefined) updates.currency = body.currency;

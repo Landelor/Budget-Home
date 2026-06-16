@@ -14,6 +14,7 @@ export interface Income {
   userId: string;
   personId: string | null;
   name: string;
+  date: string;
   amount: string;
   currency: string;
   frequency: IncomeFrequency;
@@ -38,6 +39,7 @@ export function listIncomes(): Promise<Income[]> {
 
 export function createIncome(body: {
   name: string;
+  date: string;
   amount: number;
   frequency: IncomeFrequency;
   currency: string;
@@ -48,7 +50,7 @@ export function createIncome(body: {
 
 export function updateIncome(
   id: string,
-  body: { name?: string; amount?: number; frequency?: IncomeFrequency; currency?: string; personId?: string | null },
+  body: { name?: string; date?: string; amount?: number; frequency?: IncomeFrequency; currency?: string; personId?: string | null },
 ): Promise<Income> {
   return apiFetch<Income>(`/income/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }

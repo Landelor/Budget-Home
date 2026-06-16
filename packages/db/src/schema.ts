@@ -130,6 +130,7 @@ export const incomes = pgTable("incomes", {
     .references(() => users.id, { onDelete: "cascade" }),
   personId: uuid("person_id").references(() => incomePersons.id, { onDelete: "set null" }),
   name: varchar("name", { length: 100 }).notNull(),
+  date: date("date").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).notNull().default("USD"),
   frequency: expenseFrequencyEnum("frequency").notNull(),
