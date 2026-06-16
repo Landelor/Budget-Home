@@ -2,28 +2,9 @@ import { useState, useEffect } from "react";
 import { NavBar } from "../components/NavBar.js";
 import { useIncome } from "../hooks/useIncome.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
-import type { Income, IncomeFrequency, IncomePerson } from "../api/income.js";
+import type { Income, IncomePerson } from "../api/income.js";
 import { getExchangeRates } from "../api/expenses.js";
 import { getSettings, SUPPORTED_CURRENCIES } from "../api/settings.js";
-
-const FREQUENCY_LABELS: Record<IncomeFrequency, string> = {
-  fortnightly: "Fortnightly",
-  monthly: "Monthly",
-  yearly: "Yearly",
-};
-
-function calcAmounts(amount: string, frequency: IncomeFrequency) {
-  const n = parseFloat(amount);
-  let yearly: number;
-  if (frequency === "yearly") {
-    yearly = n;
-  } else if (frequency === "monthly") {
-    yearly = n * 12;
-  } else {
-    yearly = n * 26;
-  }
-  return { fortnightly: yearly / 26, monthly: yearly / 12, yearly };
-}
 
 function fmt(n: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
@@ -55,12 +36,11 @@ interface FormState {
   name: string;
   date: string;
   amount: string;
-  frequency: IncomeFrequency;
   currency: string;
   personId: string;
 }
 
-const EMPTY_FORM: FormState = { name: "", date: todayISO(), amount: "", frequency: "monthly", currency: "USD", personId: "" };
+const EMPTY_FORM: FormState = { name: "", date: todayISO(), amount: "", currency: "USD", personId: "" };
 
 type SortKey = "name-asc" | "name-desc" | "amount-asc" | "amount-desc" | "person-asc" | "date-desc" | "date-asc";
 
@@ -84,7 +64,7 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
 
   const [sortKey, setSortKey] = useState<SortKey>(() => {
     const saved = localStorage.getItem("income-sort-key");
-    return (saved as SortKey) ?? "name-asc";
+    return (saved as SortKey) ?? "date-desc";
   });
 
   const [defaultCurrency, setDefaultCurrency] = useState("USD");
@@ -115,7 +95,6 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
       name: income.name,
       date: income.date,
       amount: parseFloat(income.amount).toString(),
-      frequency: income.frequency,
       currency: income.currency ?? defaultCurrency,
       personId: income.personId ?? "",
     });
@@ -141,9 +120,9 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
     try {
       const personId = form.personId || undefined;
       if (editing) {
-        await edit(editing.id, form.name.trim(), form.date, amount, form.frequency, form.currency, personId ?? null);
+        await edit(editing.id, form.name.trim(), form.date, amount, form.currency, personId ?? null);
       } else {
-        await add(form.name.trim(), form.date, amount, form.frequency, form.currency, personId);
+        await add(form.name.trim(), form.date, amount, form.currency, personId);
       }
       closeForm();
     } catch (e) {
@@ -181,17 +160,9 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
     }
     if (sortKey === "name-asc") return a.name.localeCompare(b.name);
     if (sortKey === "name-desc") return b.name.localeCompare(a.name);
-    const yearlyA = (() => {
-      const cur = a.currency ?? defaultCurrency;
-      const y = calcAmounts(a.amount, a.frequency).yearly;
-      return rates ? convertAmount(y, cur, defaultCurrency, rates) : y;
-    })();
-    const yearlyB = (() => {
-      const cur = b.currency ?? defaultCurrency;
-      const y = calcAmounts(b.amount, b.frequency).yearly;
-      return rates ? convertAmount(y, cur, defaultCurrency, rates) : y;
-    })();
-    return sortKey === "amount-desc" ? yearlyB - yearlyA : yearlyA - yearlyB;
+    const amtA = rates ? convertAmount(parseFloat(a.amount), a.currency ?? defaultCurrency, defaultCurrency, rates) : parseFloat(a.amount);
+    const amtB = rates ? convertAmount(parseFloat(b.amount), b.currency ?? defaultCurrency, defaultCurrency, rates) : parseFloat(b.amount);
+    return sortKey === "amount-desc" ? amtB - amtA : amtA - amtB;
   });
 
   return (
@@ -246,7 +217,6 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                   <th style={styles.th}>Date</th>
                   <th style={styles.th}>Person</th>
                   <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Entered As</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>Amount ({defaultCurrency})</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
                 </tr>
@@ -267,11 +237,10 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                         )}
                       </td>
                       <td style={styles.td}>{income.name}</td>
-                      <td style={styles.td}>
-                        {fmt(rawAmount, cur)} / {FREQUENCY_LABELS[income.frequency]}
+                      <td style={{ ...styles.td, textAlign: "right" }}>
+                        {fmt(convertedAmount, defaultCurrency)}
                         {cur !== defaultCurrency && <span style={styles.currencyTag}>{cur}</span>}
                       </td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>{fmt(convertedAmount, defaultCurrency)}</td>
                       <td style={{ ...styles.td, textAlign: "right" }}>
                         <button style={styles.actionBtn} type="button" onClick={() => openEdit(income)}>Edit</button>
                         <button
@@ -334,22 +303,9 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                 />
               </label>
 
-              <label style={styles.label}>
-                Frequency
-                <select
-                  style={styles.input}
-                  value={form.frequency}
-                  onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value as IncomeFrequency }))}
-                >
-                  <option value="fortnightly">Fortnightly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
-              </label>
-
               <div style={styles.amountRow}>
                 <label style={{ ...styles.label, flex: 1 }}>
-                  Amount ({FREQUENCY_LABELS[form.frequency]})
+                  Amount
                   <input
                     style={styles.input}
                     type="number"

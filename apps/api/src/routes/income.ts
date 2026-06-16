@@ -118,12 +118,12 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post<{
-    Body: { name: string; date: string; amount: number; frequency: IncomeFrequency; currency?: string; personId?: string };
+    Body: { name: string; date: string; amount: number; frequency?: IncomeFrequency; currency?: string; personId?: string };
   }>("/income", {
     schema: {
       body: {
         type: "object",
-        required: ["name", "date", "amount", "frequency"],
+        required: ["name", "date", "amount"],
         additionalProperties: false,
         properties: {
           name: { type: "string", minLength: 1, maxLength: 100 },
@@ -136,7 +136,7 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     handler: async (request, reply) => {
-      const { name, date, amount, frequency, currency = "USD", personId } = request.body;
+      const { name, date, amount, frequency = "monthly", currency = "USD", personId } = request.body;
 
       if (personId) {
         const [person] = await db

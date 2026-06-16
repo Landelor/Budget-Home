@@ -9,7 +9,6 @@ import {
   deleteIncomePerson,
   type Income,
   type IncomePerson,
-  type IncomeFrequency,
 } from "../api/income.js";
 
 interface IncomeState {
@@ -42,16 +41,16 @@ export function useIncome() {
   }, [refresh]);
 
   const add = useCallback(
-    async (name: string, date: string, amount: number, frequency: IncomeFrequency, currency: string, personId?: string) => {
-      const income = await createIncome({ name, date, amount, frequency, currency, ...(personId ? { personId } : {}) });
+    async (name: string, date: string, amount: number, currency: string, personId?: string) => {
+      const income = await createIncome({ name, date, amount, currency, ...(personId ? { personId } : {}) });
       setState((s) => ({ ...s, incomes: [...s.incomes, income] }));
     },
     [],
   );
 
   const edit = useCallback(
-    async (id: string, name: string, date: string, amount: number, frequency: IncomeFrequency, currency: string, personId: string | null) => {
-      const updated = await updateIncome(id, { name, date, amount, frequency, currency, personId });
+    async (id: string, name: string, date: string, amount: number, currency: string, personId: string | null) => {
+      const updated = await updateIncome(id, { name, date, amount, currency, personId });
       setState((s) => ({ ...s, incomes: s.incomes.map((i) => (i.id === id ? updated : i)) }));
     },
     [],

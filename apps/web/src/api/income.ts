@@ -41,7 +41,6 @@ export function createIncome(body: {
   name: string;
   date: string;
   amount: number;
-  frequency: IncomeFrequency;
   currency: string;
   personId?: string;
 }): Promise<Income> {
@@ -50,7 +49,7 @@ export function createIncome(body: {
 
 export function updateIncome(
   id: string,
-  body: { name?: string; date?: string; amount?: number; frequency?: IncomeFrequency; currency?: string; personId?: string | null },
+  body: { name?: string; date?: string; amount?: number; currency?: string; personId?: string | null },
 ): Promise<Income> {
   return apiFetch<Income>(`/income/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 }
