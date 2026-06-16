@@ -1,63 +1,180 @@
 import { useState, useEffect } from "react";
-import { getDashboardSummary, type DashboardSummary } from "../api/budgets.js";
 import { NavBar } from "../components/NavBar.js";
+import { useExpenses } from "../hooks/useExpenses.js";
+import { listUtilities } from "../api/utilities.js";
+import type { Utility, UtilityType } from "../api/utilities.js";
+import { getExchangeRates } from "../api/expenses.js";
+import type { ExpenseFrequency } from "../api/expenses.js";
+import { getSettings } from "../api/settings.js";
+
+interface OffsetItem {
+  id: string;
+  expenseId: string;
+}
+
+function loadOffsetItems(): OffsetItem[] {
+  try {
+    const raw = localStorage.getItem("expenses-offset-items");
+    return raw ? (JSON.parse(raw) as OffsetItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function calcYearly(amount: string, frequency: ExpenseFrequency): number {
+  const n = parseFloat(amount);
+  if (frequency === "yearly") return n;
+  if (frequency === "monthly") return n * 12;
+  return n * 26;
+}
+
+function convertAmount(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string,
+  rates: Record<string, number>,
+): number {
+  if (fromCurrency === toCurrency) return amount;
+  const fromRate = rates[fromCurrency];
+  const toRate = rates[toCurrency];
+  if (!fromRate || !toRate) return amount;
+  return (amount / fromRate) * toRate;
+}
+
+function fmt(n: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
 
 interface Props {
   onLogout: () => void;
   onNavigate: (page: string) => void;
 }
 
-function fmt(amount: string | number): string {
-  const n = typeof amount === "string" ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
 export function DashboardPage({ onLogout, onNavigate }: Props) {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const { expenses, loading: expensesLoading } = useExpenses();
+  const [defaultCurrency, setDefaultCurrency] = useState("USD");
+  const [rates, setRates] = useState<Record<string, number> | null>(null);
+  const [ratesDate, setRatesDate] = useState<string | null>(null);
+  const [utilities, setUtilities] = useState<Utility[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const offsetItems = loadOffsetItems();
 
   useEffect(() => {
-    getDashboardSummary()
-      .then(setSummary)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+    Promise.all([
+      getSettings().then((s) => setDefaultCurrency(s.defaultCurrency)).catch(() => {}),
+      getExchangeRates()
+        .then(({ rates, date }) => {
+          setRates(rates);
+          setRatesDate(date);
+        })
+        .catch(() => {}),
+      listUtilities().then(setUtilities).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
+
+  function getOffsetYearly(expenseId: string): number {
+    const exp = expenses.find((e) => e.id === expenseId);
+    if (!exp) return 0;
+    const expCurrency = exp.currency ?? defaultCurrency;
+    const yearly = calcYearly(exp.amount, exp.frequency);
+    const converted = rates ? convertAmount(yearly, expCurrency, defaultCurrency, rates) : yearly;
+    return Math.ceil(converted / 100) * 100;
+  }
+
+  const rawTotalWeekly = offsetItems.reduce((sum, o) => sum + getOffsetYearly(o.expenseId) / 52, 0);
+  const offsetWeekly = Math.ceil(rawTotalWeekly / 10) * 10;
+
+  function utilityStats(type: UtilityType) {
+    const rows = utilities.filter((u) => u.type === type);
+    if (rows.length === 0) return null;
+    const avgAmount =
+      rows.reduce((s, u) => {
+        const raw = parseFloat(u.amount);
+        const cur = u.currency ?? defaultCurrency;
+        return s + (rates ? convertAmount(raw, cur, defaultCurrency, rates) : raw);
+      }, 0) / rows.length;
+    const avgDays = rows.reduce((s, u) => s + u.serviceDays, 0) / rows.length;
+    const perDay = avgAmount / avgDays;
+    const perFortnight = perDay * 14;
+    return { perDay, perFortnight };
+  }
+
+  const foreignCurrencies = [
+    ...new Set(
+      expenses.map((e) => e.currency ?? defaultCurrency).filter((c) => c !== defaultCurrency),
+    ),
+  ];
+
+  const isLoading = loading || expensesLoading;
 
   return (
     <div style={styles.page}>
       <NavBar onLogout={onLogout} onNavigate={onNavigate} activePage="dashboard" />
 
       <main style={styles.main}>
-        {loading && <p style={styles.status}>Loading…</p>}
-        {error && <p style={styles.errorMsg}>{error}</p>}
+        {isLoading && <p style={styles.status}>Loading…</p>}
 
-        {!loading && !error && (
-          <div style={styles.summaryGrid}>
-            <div style={styles.summaryCard}>
-              <p style={styles.summaryLabel}>Total balance</p>
-              <p style={styles.summaryValue}>
-                {summary ? fmt(summary.totalBalance) : "—"}
-              </p>
+        {!isLoading && (
+          <>
+            <div style={styles.summaryGrid}>
+              <div style={styles.summaryCard}>
+                <p style={styles.summaryLabel}>Offset Amount</p>
+                <p style={styles.summaryValue}>{fmt(offsetWeekly, defaultCurrency)}</p>
+                <p style={styles.summarySubLabel}>per week</p>
+              </div>
+
+              {(["gas", "power", "water"] as UtilityType[]).map((type) => {
+                const stats = utilityStats(type);
+                if (!stats) return null;
+                const label = type.charAt(0).toUpperCase() + type.slice(1);
+                return (
+                  <div key={type} style={styles.summaryCard}>
+                    <p style={styles.summaryLabel}>{label}</p>
+                    <p style={styles.summaryValue}>{fmt(stats.perFortnight, defaultCurrency)}</p>
+                    <p style={styles.summarySubLabel}>
+                      per fortnight &middot; {fmt(stats.perDay, defaultCurrency)}/day
+                    </p>
+                  </div>
+                );
+              })}
             </div>
-            <div style={styles.summaryCard}>
-              <p style={styles.summaryLabel}>Spent this month</p>
-              <p style={{ ...styles.summaryValue, color: "#dc2626" }}>
-                {summary ? fmt(summary.totalSpentThisMonth) : "—"}
-              </p>
-            </div>
-            <div style={styles.summaryCard}>
-              <p style={styles.summaryLabel}>Income this month</p>
-              <p style={{ ...styles.summaryValue, color: "#16a34a" }}>
-                {summary ? fmt(summary.totalIncomeThisMonth) : "—"}
-              </p>
-            </div>
-          </div>
+
+            {foreignCurrencies.length > 0 && rates && (
+              <div style={styles.ratesCard}>
+                <div style={styles.ratesCardHeader}>
+                  <span style={styles.ratesCardTitle}>Exchange Rates</span>
+                  {ratesDate && (
+                    <span style={styles.ratesCardDate}>
+                      Rates as of {ratesDate} (base: {defaultCurrency})
+                    </span>
+                  )}
+                </div>
+                <div style={styles.ratesGrid}>
+                  {foreignCurrencies.map((c) => {
+                    const fromRate = rates[c];
+                    const toRate = rates[defaultCurrency];
+                    if (!fromRate || !toRate) return null;
+                    const rate = toRate / fromRate;
+                    return (
+                      <div key={c} style={styles.rateItem}>
+                        <span style={styles.rateCurrency}>{c}</span>
+                        <span style={styles.rateArrow}>→</span>
+                        <span style={styles.rateValue}>
+                          {rate.toFixed(4)} {defaultCurrency}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
@@ -79,7 +196,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
     gap: "1rem",
-    marginBottom: "2rem",
+    marginBottom: "1.5rem",
   },
   summaryCard: {
     background: "var(--bg-card)",
@@ -97,22 +214,69 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: "0.04em",
   },
   summaryValue: {
-    margin: 0,
+    margin: "0 0 0.2rem",
     fontSize: "1.5rem",
     fontWeight: 700,
+    color: "var(--text-primary)",
+  },
+  summarySubLabel: {
+    margin: 0,
+    fontSize: "0.75rem",
+    color: "var(--text-secondary)",
+  },
+  ratesCard: {
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "1rem 1.25rem",
+    marginBottom: "1.5rem",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  },
+  ratesCardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "0.75rem",
+  },
+  ratesCardTitle: {
+    fontSize: "0.85rem",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: "var(--text-secondary)",
+  },
+  ratesCardDate: {
+    fontSize: "0.75rem",
+    color: "var(--text-secondary)",
+  },
+  ratesGrid: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "0.75rem",
+  },
+  rateItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.4rem",
+    background: "var(--bg-page)",
+    border: "1px solid var(--border)",
+    borderRadius: "8px",
+    padding: "0.4rem 0.875rem",
+    fontSize: "0.875rem",
+  },
+  rateCurrency: {
+    fontWeight: 700,
+    color: "var(--text-primary)",
+  },
+  rateArrow: {
+    color: "var(--text-secondary)",
+  },
+  rateValue: {
     color: "var(--text-primary)",
   },
   status: {
     color: "var(--text-secondary)",
     textAlign: "center",
     padding: "3rem 0",
-  },
-  errorMsg: {
-    color: "#dc2626",
-    background: "#fef2f2",
-    padding: "0.75rem 1rem",
-    borderRadius: "8px",
-    fontSize: "0.9rem",
-    marginBottom: "1rem",
   },
 };

@@ -5,8 +5,6 @@ import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 import type { Expense, ExpenseFrequency } from "../api/expenses.js";
 import { getExchangeRates } from "../api/expenses.js";
 import { getSettings, SUPPORTED_CURRENCIES } from "../api/settings.js";
-import { listUtilities } from "../api/utilities.js";
-import type { Utility, UtilityType } from "../api/utilities.js";
 
 const FREQUENCY_LABELS: Record<ExpenseFrequency, string> = {
   fortnightly: "Fortnightly",
@@ -32,15 +30,6 @@ function calcAmounts(amount: string, frequency: ExpenseFrequency) {
 }
 
 function fmt(n: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
-function fmt2(n: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
@@ -94,9 +83,6 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
 
   const [defaultCurrency, setDefaultCurrency] = useState("USD");
   const [rates, setRates] = useState<Record<string, number> | null>(null);
-  const [ratesDate, setRatesDate] = useState<string | null>(null);
-  const [ratesError, setRatesError] = useState<string | null>(null);
-  const [utilityEntries, setUtilityEntries] = useState<Utility[]>([]);
 
   useEffect(() => {
     getSettings()
@@ -107,16 +93,7 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
       .catch(() => {});
 
     getExchangeRates()
-      .then(({ rates, date }) => {
-        setRates(rates);
-        setRatesDate(date);
-      })
-      .catch(() => {
-        setRatesError("Could not load exchange rates");
-      });
-
-    listUtilities()
-      .then(setUtilityEntries)
+      .then(({ rates }) => setRates(rates))
       .catch(() => {});
   }, []);
 
@@ -178,32 +155,6 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
     setDeleting(null);
   }
 
-  function utilityStats(type: UtilityType) {
-    const rows = utilityEntries.filter((u) => u.type === type);
-    if (rows.length === 0) return null;
-    const avgAmount = rows.reduce((s, u) => {
-      const raw = parseFloat(u.amount);
-      const cur = u.currency ?? defaultCurrency;
-      return s + (rates ? convertAmount(raw, cur, defaultCurrency, rates) : raw);
-    }, 0) / rows.length;
-    const avgDays = rows.reduce((s, u) => s + u.serviceDays, 0) / rows.length;
-    const perDay = avgAmount / avgDays;
-    const perFortnight = perDay * 14;
-    return { avgAmount, avgDays, perDay, perFortnight, count: rows.length };
-  }
-
-  const utilityTypes: UtilityType[] = ["gas", "power", "water"];
-  const utilityTypeLabels: Record<UtilityType, string> = { gas: "Gas", power: "Power", water: "Water" };
-  const hasUtilities = utilityEntries.length > 0;
-
-  const foreignCurrencies = [...new Set(
-    expenses
-      .map((e) => e.currency ?? defaultCurrency)
-      .filter((c) => c !== defaultCurrency),
-  )];
-
-  const showRatesCard = foreignCurrencies.length > 0;
-
   const sortedExpenses = [...expenses].sort((a, b) => {
     if (sortKey === "name-asc") return a.name.localeCompare(b.name);
     if (sortKey === "name-desc") return b.name.localeCompare(a.name);
@@ -250,74 +201,6 @@ export function ExpensesPage({ onLogout, onNavigate }: Props) {
             </button>
           </div>
         </div>
-
-        {showRatesCard && rates && (
-          <div style={styles.ratesCard}>
-            <div style={styles.ratesCardHeader}>
-              <span style={styles.ratesCardTitle}>Exchange Rates</span>
-              {ratesDate && (
-                <span style={styles.ratesCardDate}>
-                  Rates as of {ratesDate} (base: {defaultCurrency})
-                </span>
-              )}
-            </div>
-            <div style={styles.ratesGrid}>
-              {foreignCurrencies.map((c) => {
-                const fromRate = rates[c];
-                const toRate = rates[defaultCurrency];
-                if (!fromRate || !toRate) return null;
-                const rate = toRate / fromRate;
-                return (
-                  <div key={c} style={styles.rateItem}>
-                    <span style={styles.rateCurrency}>{c}</span>
-                    <span style={styles.rateArrow}>→</span>
-                    <span style={styles.rateValue}>
-                      {rate.toFixed(4)} {defaultCurrency}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            {ratesError && <p style={styles.ratesError}>{ratesError}</p>}
-          </div>
-        )}
-
-        {hasUtilities && (
-          <div style={styles.utilitiesCard}>
-            <div style={styles.utilitiesCardHeader}>
-              <span style={styles.utilitiesCardTitle}>Utilities</span>
-            </div>
-            <div style={styles.utilitiesGrid}>
-              {utilityTypes.map((type) => {
-                const stats = utilityStats(type);
-                if (!stats) return null;
-                return (
-                  <div key={type} style={styles.utilityItem}>
-                    <div style={styles.utilityLabel}>{utilityTypeLabels[type]}</div>
-                    <div style={styles.utilityStats}>
-                      <div style={styles.utilityStat}>
-                        <span style={styles.utilityStatLabel}>Avg Bill</span>
-                        <span style={styles.utilityStatValue}>{fmt2(stats.avgAmount, defaultCurrency)}</span>
-                      </div>
-                      <div style={styles.utilityStat}>
-                        <span style={styles.utilityStatLabel}>Avg Days</span>
-                        <span style={styles.utilityStatValue}>{stats.avgDays.toFixed(1)}</span>
-                      </div>
-                      <div style={styles.utilityStat}>
-                        <span style={styles.utilityStatLabel}>Per Day</span>
-                        <span style={styles.utilityStatValue}>{fmt2(stats.perDay, defaultCurrency)}</span>
-                      </div>
-                      <div style={styles.utilityStat}>
-                        <span style={styles.utilityStatLabel}>Per Fortnight</span>
-                        <span style={styles.utilityStatValue}>{fmt2(stats.perFortnight, defaultCurrency)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {loading && <p style={styles.status}>Loading…</p>}
         {error && <p style={styles.errorMsg}>{error}</p>}
@@ -515,61 +398,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.9rem",
     fontWeight: 600,
   },
-  ratesCard: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: "12px",
-    padding: "1rem 1.25rem",
-    marginBottom: "1.5rem",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-  },
-  ratesCardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "0.75rem",
-  },
-  ratesCardTitle: {
-    fontSize: "0.85rem",
-    fontWeight: 700,
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    color: "var(--text-secondary)",
-  },
-  ratesCardDate: {
-    fontSize: "0.75rem",
-    color: "var(--text-secondary)",
-  },
-  ratesGrid: {
-    display: "flex",
-    flexWrap: "wrap" as const,
-    gap: "0.75rem",
-  },
-  rateItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.4rem",
-    background: "var(--bg-page)",
-    border: "1px solid var(--border)",
-    borderRadius: "8px",
-    padding: "0.4rem 0.875rem",
-    fontSize: "0.875rem",
-  },
-  rateCurrency: {
-    fontWeight: 700,
-    color: "var(--text-primary)",
-  },
-  rateArrow: {
-    color: "var(--text-secondary)",
-  },
-  rateValue: {
-    color: "var(--text-primary)",
-  },
-  ratesError: {
-    color: "#dc2626",
-    fontSize: "0.8rem",
-    margin: "0.5rem 0 0",
-  },
   status: {
     color: "var(--text-secondary)",
     textAlign: "center",
@@ -747,63 +575,5 @@ const styles: Record<string, React.CSSProperties> = {
     background: "var(--bg-page)",
     color: "var(--text-primary)",
     cursor: "pointer",
-  },
-  utilitiesCard: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: "12px",
-    padding: "1rem 1.25rem",
-    marginBottom: "1.5rem",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-  },
-  utilitiesCardHeader: {
-    marginBottom: "0.875rem",
-  },
-  utilitiesCardTitle: {
-    fontSize: "0.85rem",
-    fontWeight: 700,
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    color: "var(--text-secondary)",
-  },
-  utilitiesGrid: {
-    display: "flex",
-    flexWrap: "wrap" as const,
-    gap: "1rem",
-  },
-  utilityItem: {
-    flex: "1 1 200px",
-    background: "var(--bg-page)",
-    border: "1px solid var(--border)",
-    borderRadius: "10px",
-    padding: "0.875rem 1rem",
-  },
-  utilityLabel: {
-    fontSize: "0.875rem",
-    fontWeight: 700,
-    color: "var(--text-primary)",
-    marginBottom: "0.625rem",
-  },
-  utilityStats: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "0.5rem",
-  },
-  utilityStat: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "0.15rem",
-  },
-  utilityStatLabel: {
-    fontSize: "0.7rem",
-    fontWeight: 600,
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.04em",
-    color: "var(--text-secondary)",
-  },
-  utilityStatValue: {
-    fontSize: "0.9rem",
-    fontWeight: 600,
-    color: "var(--text-primary)",
   },
 };

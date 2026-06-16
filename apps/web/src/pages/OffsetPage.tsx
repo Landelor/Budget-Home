@@ -100,9 +100,6 @@ export function OffsetPage({ onLogout, onNavigate }: Props) {
     saveOffsetItems(newItems);
   }
 
-  const rawTotalWeekly = offsetItems.reduce((sum, o) => sum + getOffsetYearly(o.expenseId) / 52, 0);
-  const totalWeekly = Math.ceil(rawTotalWeekly / 10) * 10;
-
   return (
     <div style={styles.page}>
       <NavBar onLogout={onLogout} onNavigate={onNavigate} activePage="offset" />
@@ -117,13 +114,6 @@ export function OffsetPage({ onLogout, onNavigate }: Props) {
           >
             + Add
           </button>
-        </div>
-
-        {/* Offset Amount card */}
-        <div style={styles.amountCard}>
-          <div style={styles.amountLabel}>Offset Amount</div>
-          <div style={styles.amountValue}>{fmt(totalWeekly, defaultCurrency)}</div>
-          <div style={styles.amountSub}>per week</div>
         </div>
 
         {/* Add selector */}
@@ -224,34 +214,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: "0.9rem",
     fontWeight: 600,
-  },
-  amountCard: {
-    background: "var(--bg-card)",
-    border: "1px solid var(--border)",
-    borderRadius: "12px",
-    padding: "1.5rem",
-    marginBottom: "1.5rem",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-    textAlign: "center",
-    maxWidth: "300px",
-  },
-  amountLabel: {
-    fontSize: "0.75rem",
-    fontWeight: 700,
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    color: "var(--text-secondary)",
-    marginBottom: "0.35rem",
-  },
-  amountValue: {
-    fontSize: "2rem",
-    fontWeight: 700,
-    color: "var(--text-primary)",
-  },
-  amountSub: {
-    fontSize: "0.8rem",
-    color: "var(--text-secondary)",
-    marginTop: "0.15rem",
   },
   selectRow: {
     display: "flex",

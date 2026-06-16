@@ -3,14 +3,12 @@ import { useAuth } from "./hooks/useAuth.js";
 import { ThemeProvider } from "./hooks/useTheme.js";
 import { AuthPage } from "./pages/AuthPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
-import { AccountsPage } from "./pages/AccountsPage.js";
-import { TransactionsPage } from "./pages/TransactionsPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { ExpensesPage } from "./pages/ExpensesPage.js";
 import { OffsetPage } from "./pages/OffsetPage.js";
 import { UtilitiesPage } from "./pages/UtilitiesPage.js";
 
-type Page = "dashboard" | "transactions" | "accounts" | "expenses" | "offset" | "utilities" | "settings";
+type Page = "dashboard" | "expenses" | "offset" | "utilities" | "settings";
 
 export function App() {
   const { isAuthenticated, loading, error, login, register, logout } = useAuth();
@@ -31,18 +29,6 @@ export function App() {
 
   return (
     <ThemeProvider isAuthenticated={true}>
-      {page === "accounts" && (
-        <AccountsPage
-          onLogout={logout}
-          onNavigate={(p) => setPage(p as Page)}
-        />
-      )}
-      {page === "transactions" && (
-        <TransactionsPage
-          onLogout={logout}
-          onNavigate={(p) => setPage(p as Page)}
-        />
-      )}
       {page === "expenses" && (
         <ExpensesPage
           onLogout={logout}

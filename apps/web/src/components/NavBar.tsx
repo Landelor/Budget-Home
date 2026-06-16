@@ -37,12 +37,6 @@ export function NavBar({ onLogout, onNavigate, activePage }: Props) {
         <button style={navBtn("dashboard")} type="button" onClick={() => onNavigate("dashboard")}>
           Dashboard
         </button>
-        <button style={navBtn("transactions")} type="button" onClick={() => onNavigate("transactions")}>
-          Transactions
-        </button>
-        <button style={navBtn("accounts")} type="button" onClick={() => onNavigate("accounts")}>
-          Accounts
-        </button>
 
         {/* Expenses dropdown */}
         <div ref={dropRef} style={styles.dropWrapper}>
