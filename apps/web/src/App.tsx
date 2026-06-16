@@ -7,9 +7,10 @@ import { AccountsPage } from "./pages/AccountsPage.js";
 import { TransactionsPage } from "./pages/TransactionsPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { ExpensesPage } from "./pages/ExpensesPage.js";
+import { OffsetPage } from "./pages/OffsetPage.js";
 import { UtilitiesPage } from "./pages/UtilitiesPage.js";
 
-type Page = "dashboard" | "transactions" | "accounts" | "expenses" | "utilities" | "settings";
+type Page = "dashboard" | "transactions" | "accounts" | "expenses" | "offset" | "utilities" | "settings";
 
 export function App() {
   const { isAuthenticated, loading, error, login, register, logout } = useAuth();
@@ -44,6 +45,12 @@ export function App() {
       )}
       {page === "expenses" && (
         <ExpensesPage
+          onLogout={logout}
+          onNavigate={(p) => setPage(p as Page)}
+        />
+      )}
+      {page === "offset" && (
+        <OffsetPage
           onLogout={logout}
           onNavigate={(p) => setPage(p as Page)}
         />

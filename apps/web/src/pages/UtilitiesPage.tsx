@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useUtilities } from "../hooks/useUtilities.js";
-import { useTheme } from "../hooks/useTheme.js";
+import { NavBar } from "../components/NavBar.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 import type { Utility, UtilityType } from "../api/utilities.js";
 import { getExchangeRates } from "../api/expenses.js";
@@ -50,7 +50,6 @@ interface FormState {
 
 export function UtilitiesPage({ onLogout, onNavigate }: Props) {
   const { utilities, loading, error, add, edit, remove } = useUtilities();
-  const { isDark, toggleTheme } = useTheme();
 
   const [activeType, setActiveType] = useState<UtilityType>("gas");
   const [showForm, setShowForm] = useState(false);
@@ -140,21 +139,7 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <h1 style={styles.heading}>BudgetApp</h1>
-        <nav style={styles.nav}>
-          <button style={styles.navBtn} type="button" onClick={() => onNavigate("dashboard")}>Dashboard</button>
-          <button style={styles.navBtn} type="button" onClick={() => onNavigate("transactions")}>Transactions</button>
-          <button style={styles.navBtn} type="button" onClick={() => onNavigate("accounts")}>Accounts</button>
-          <button style={styles.navBtn} type="button" onClick={() => onNavigate("expenses")}>Expenses</button>
-          <button style={{ ...styles.navBtn, ...styles.navBtnActive }} type="button">Utilities</button>
-          <button style={styles.navBtn} type="button" onClick={() => onNavigate("settings")}>Settings</button>
-        </nav>
-        <button onClick={toggleTheme} style={styles.themeBtn} type="button" title="Toggle dark mode">
-          {isDark ? "Light mode" : "Dark mode"}
-        </button>
-        <button onClick={onLogout} style={styles.logoutBtn} type="button">Sign out</button>
-      </header>
+      <NavBar onLogout={onLogout} onNavigate={onNavigate} activePage="utilities" />
 
       <main style={styles.main}>
         <div style={styles.toolbar}>
@@ -330,28 +315,6 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
 
 const styles: Record<string, React.CSSProperties> = {
   page: { minHeight: "100vh", background: "var(--bg-page)", fontFamily: "system-ui, sans-serif" },
-  header: {
-    background: "#1a1a2e", color: "#fff", padding: "0.75rem 2rem",
-    display: "flex", alignItems: "center", gap: "1.5rem",
-  },
-  heading: { margin: 0, fontSize: "1.2rem", fontWeight: 700 },
-  nav: { display: "flex", gap: "0.25rem", flex: 1 },
-  navBtn: {
-    background: "transparent", border: "none", color: "rgba(255,255,255,0.65)",
-    padding: "0.4rem 0.875rem", borderRadius: "6px", cursor: "pointer",
-    fontSize: "0.875rem", fontWeight: 500,
-  },
-  navBtnActive: { background: "rgba(255,255,255,0.12)", color: "#fff" },
-  themeBtn: {
-    background: "transparent", border: "1px solid rgba(255,255,255,0.3)",
-    color: "rgba(255,255,255,0.8)", padding: "0.4rem 0.75rem",
-    borderRadius: "6px", cursor: "pointer", fontSize: "0.8rem",
-  },
-  logoutBtn: {
-    background: "transparent", border: "1px solid rgba(255,255,255,0.3)",
-    color: "#fff", padding: "0.4rem 1rem", borderRadius: "6px",
-    cursor: "pointer", fontSize: "0.875rem",
-  },
   main: { maxWidth: "1100px", margin: "0 auto", padding: "2rem 1.5rem" },
   toolbar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" },
   pageTitle: { margin: 0, fontSize: "1.4rem", fontWeight: 700, color: "var(--text-primary)" },

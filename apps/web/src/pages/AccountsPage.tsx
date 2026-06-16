@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAccounts } from "../hooks/useAccounts.js";
-import { useTheme } from "../hooks/useTheme.js";
+import { NavBar } from "../components/NavBar.js";
 import { AccountForm } from "../components/AccountForm.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 import type { Account, AccountType } from "../api/accounts.js";
@@ -22,12 +22,11 @@ const TYPE_COLORS: Record<AccountType, string> = {
 
 interface Props {
   onLogout: () => void;
-  onNavigate?: (page: string) => void;
+  onNavigate: (page: string) => void;
 }
 
 export function AccountsPage({ onLogout, onNavigate }: Props) {
   const { accounts, loading, error, add, edit, remove } = useAccounts();
-  const { isDark, toggleTheme } = useTheme();
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Account | null>(null);
   const [deleting, setDeleting] = useState<Account | null>(null);
@@ -58,60 +57,7 @@ export function AccountsPage({ onLogout, onNavigate }: Props) {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <h1 style={styles.heading}>BudgetApp</h1>
-        {onNavigate && (
-          <nav style={{ display: "flex", gap: "0.25rem", flex: 1 }}>
-            <button
-              style={styles.navBtn}
-              type="button"
-              onClick={() => onNavigate("dashboard")}
-            >
-              Dashboard
-            </button>
-            <button
-              style={styles.navBtn}
-              type="button"
-              onClick={() => onNavigate("transactions")}
-            >
-              Transactions
-            </button>
-            <button
-              style={{ ...styles.navBtn, background: "rgba(255,255,255,0.12)", color: "#fff" }}
-              type="button"
-            >
-              Accounts
-            </button>
-            <button
-              style={styles.navBtn}
-              type="button"
-              onClick={() => onNavigate("expenses")}
-            >
-              Expenses
-            </button>
-            <button
-              style={styles.navBtn}
-              type="button"
-              onClick={() => onNavigate("utilities")}
-            >
-              Utilities
-            </button>
-            <button
-              style={styles.navBtn}
-              type="button"
-              onClick={() => onNavigate("settings")}
-            >
-              Settings
-            </button>
-          </nav>
-        )}
-        <button onClick={toggleTheme} style={styles.themeBtn} type="button" title="Toggle dark mode">
-          {isDark ? "Light mode" : "Dark mode"}
-        </button>
-        <button onClick={onLogout} style={styles.logoutBtn} type="button">
-          Sign out
-        </button>
-      </header>
+      <NavBar onLogout={onLogout} onNavigate={onNavigate} activePage="accounts" />
 
       <main style={styles.main}>
         <div style={styles.titleRow}>
@@ -214,47 +160,6 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: "100vh",
     background: "var(--bg-page)",
     fontFamily: "system-ui, sans-serif",
-  },
-  header: {
-    background: "#1a1a2e",
-    color: "#fff",
-    padding: "0.75rem 2rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "1.5rem",
-  },
-  heading: {
-    margin: 0,
-    fontSize: "1.25rem",
-    fontWeight: 700,
-  },
-  navBtn: {
-    background: "transparent",
-    border: "none",
-    color: "rgba(255,255,255,0.65)",
-    padding: "0.4rem 0.875rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
-    fontWeight: 500,
-  },
-  themeBtn: {
-    background: "transparent",
-    border: "1px solid rgba(255,255,255,0.3)",
-    color: "rgba(255,255,255,0.8)",
-    padding: "0.4rem 0.75rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-  },
-  logoutBtn: {
-    background: "transparent",
-    border: "1px solid rgba(255,255,255,0.3)",
-    color: "#fff",
-    padding: "0.4rem 1rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
   },
   main: {
     maxWidth: "900px",
