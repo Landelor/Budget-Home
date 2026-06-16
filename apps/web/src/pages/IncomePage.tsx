@@ -247,17 +247,15 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                   <th style={styles.th}>Person</th>
                   <th style={styles.th}>Name</th>
                   <th style={styles.th}>Entered As</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Fortnightly ({defaultCurrency})</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Monthly ({defaultCurrency})</th>
-                  <th style={{ ...styles.th, textAlign: "right" }}>Yearly ({defaultCurrency})</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>Amount ({defaultCurrency})</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedIncomes.map((income) => {
                   const cur = income.currency ?? defaultCurrency;
-                  const amounts = calcAmounts(income.amount, income.frequency);
-                  const convert = (n: number) => (rates ? convertAmount(n, cur, defaultCurrency, rates) : n);
+                  const rawAmount = parseFloat(income.amount);
+                  const convertedAmount = rates ? convertAmount(rawAmount, cur, defaultCurrency, rates) : rawAmount;
                   return (
                     <tr key={income.id} style={styles.tr}>
                       <td style={styles.td}>{income.date}</td>
@@ -270,12 +268,10 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                       </td>
                       <td style={styles.td}>{income.name}</td>
                       <td style={styles.td}>
-                        {fmt(parseFloat(income.amount), cur)} / {FREQUENCY_LABELS[income.frequency]}
+                        {fmt(rawAmount, cur)} / {FREQUENCY_LABELS[income.frequency]}
                         {cur !== defaultCurrency && <span style={styles.currencyTag}>{cur}</span>}
                       </td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>{fmt(convert(amounts.fortnightly), defaultCurrency)}</td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>{fmt(convert(amounts.monthly), defaultCurrency)}</td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>{fmt(convert(amounts.yearly), defaultCurrency)}</td>
+                      <td style={{ ...styles.td, textAlign: "right" }}>{fmt(convertedAmount, defaultCurrency)}</td>
                       <td style={{ ...styles.td, textAlign: "right" }}>
                         <button style={styles.actionBtn} type="button" onClick={() => openEdit(income)}>Edit</button>
                         <button
