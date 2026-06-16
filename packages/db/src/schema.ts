@@ -113,6 +113,30 @@ export const expenses = pgTable("expenses", {
   deletedAt: timestamp("deleted_at"),
 });
 
+export const incomePersons = pgTable("income_persons", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export const incomes = pgTable("incomes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  personId: uuid("person_id").references(() => incomePersons.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  frequency: expenseFrequencyEnum("frequency").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
 export const utilities = pgTable("utilities", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -146,6 +170,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   categories: many(categories),
   expenses: many(expenses),
   utilities: many(utilities),
+  incomePersons: many(incomePersons),
+  incomes: many(incomes),
   refreshTokens: many(refreshTokens),
 }));
 
@@ -201,6 +227,16 @@ export const utilitiesRelations = relations(utilities, ({ one }) => ({
   user: one(users, { fields: [utilities.userId], references: [users.id] }),
 }));
 
+export const incomePersonsRelations = relations(incomePersons, ({ one, many }) => ({
+  user: one(users, { fields: [incomePersons.userId], references: [users.id] }),
+  incomes: many(incomes),
+}));
+
+export const incomesRelations = relations(incomes, ({ one }) => ({
+  user: one(users, { fields: [incomes.userId], references: [users.id] }),
+  person: one(incomePersons, { fields: [incomes.personId], references: [incomePersons.id] }),
+}));
+
 // Inferred TypeScript types
 
 export type User = typeof users.$inferSelect;
@@ -223,6 +259,12 @@ export type NewExpense = typeof expenses.$inferInsert;
 
 export type Utility = typeof utilities.$inferSelect;
 export type NewUtility = typeof utilities.$inferInsert;
+
+export type IncomePerson = typeof incomePersons.$inferSelect;
+export type NewIncomePerson = typeof incomePersons.$inferInsert;
+
+export type Income = typeof incomes.$inferSelect;
+export type NewIncome = typeof incomes.$inferInsert;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;

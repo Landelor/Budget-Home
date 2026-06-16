@@ -67,6 +67,9 @@ export function NavBar({ onLogout, onNavigate, activePage }: Props) {
           )}
         </div>
 
+        <button style={navBtn("income")} type="button" onClick={() => onNavigate("income")}>
+          Income
+        </button>
         <button style={navBtn("utilities")} type="button" onClick={() => onNavigate("utilities")}>
           Utilities
         </button>
