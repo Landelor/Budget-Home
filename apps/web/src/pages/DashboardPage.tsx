@@ -228,7 +228,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
                         ))}
                       </select>
                       <span style={styles.incomePersonAvg}>
-                        {fmt((totalAvgIncome * pct) / 100, defaultCurrency)}
+                        {fmt((totalAvgIncome * pct) / 100 / 2, defaultCurrency)}
                       </span>
                     </div>
                   ))}
