@@ -289,9 +289,10 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
       const storageKey = `${randomUUID()}.pdf`;
       const dest = join(UPLOAD_DIR, storageKey);
 
-      await pipeline(data.file, createWriteStream(dest));
-
-      const fileSize = data.file.bytesRead;
+      let fileSize = 0;
+      const writeStream = createWriteStream(dest);
+      data.file.on("data", (chunk: Buffer) => { fileSize += chunk.length; });
+      await pipeline(data.file, writeStream);
       const [attachment] = await db
         .insert(incomeAttachments)
         .values({
