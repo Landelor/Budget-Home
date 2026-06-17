@@ -6,6 +6,8 @@ import type { Utility, UtilityType } from "../api/utilities.js";
 import { getExchangeRates } from "../api/expenses.js";
 import type { ExpenseFrequency } from "../api/expenses.js";
 import { getSettings } from "../api/settings.js";
+import { listIncomes } from "../api/income.js";
+import type { Income } from "../api/income.js";
 
 interface OffsetItem {
   id: string;
@@ -61,6 +63,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
   const [rates, setRates] = useState<Record<string, number> | null>(null);
   const [ratesDate, setRatesDate] = useState<string | null>(null);
   const [utilities, setUtilities] = useState<Utility[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
   const [loading, setLoading] = useState(true);
 
   const offsetItems = loadOffsetItems();
@@ -75,6 +78,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
         })
         .catch(() => {}),
       listUtilities().then(setUtilities).catch(() => {}),
+      listIncomes().then(setIncomes).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -111,6 +115,20 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
     ),
   ];
 
+  const { avgIncomePerPerson, avgIncomePersonCount } = (() => {
+    const personTotals: Record<string, number> = {};
+    for (const inc of incomes) {
+      if (!inc.personId) continue;
+      const cur = inc.currency ?? defaultCurrency;
+      const amount = parseFloat(inc.amount);
+      const converted = rates ? convertAmount(amount, cur, defaultCurrency, rates) : amount;
+      personTotals[inc.personId] = (personTotals[inc.personId] ?? 0) + converted;
+    }
+    const count = Object.keys(personTotals).length;
+    const avg = count === 0 ? null : Object.values(personTotals).reduce((a, b) => a + b, 0) / count;
+    return { avgIncomePerPerson: avg, avgIncomePersonCount: count };
+  })();
+
   const isLoading = loading || expensesLoading;
 
   return (
@@ -128,6 +146,16 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
                 <p style={styles.summaryValue}>{fmt(offsetWeekly, defaultCurrency)}</p>
                 <p style={styles.summarySubLabel}>per week</p>
               </div>
+
+              {avgIncomePerPerson !== null && (
+                <div style={styles.summaryCard}>
+                  <p style={styles.summaryLabel}>Avg Income / Person</p>
+                  <p style={styles.summaryValue}>{fmt(avgIncomePerPerson, defaultCurrency)}</p>
+                  <p style={styles.summarySubLabel}>
+                    across {avgIncomePersonCount} {avgIncomePersonCount === 1 ? "person" : "people"}
+                  </p>
+                </div>
+              )}
 
               {(["gas", "power", "water"] as UtilityType[]).map((type) => {
                 const stats = utilityStats(type);
