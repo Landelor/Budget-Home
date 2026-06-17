@@ -1,7 +1,17 @@
 import type { FastifyInstance } from "fastify";
-import { db, utilities } from "@budgetapp/db";
+import { db, utilities, utilityAttachments } from "@budgetapp/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { authenticate } from "../middleware/authenticate.js";
+import { randomUUID } from "node:crypto";
+import { createWriteStream, createReadStream, existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { pipeline } from "node:stream/promises";
+
+const UPLOAD_DIR = process.env["UPLOAD_DIR"] ?? join(process.cwd(), "uploads");
+
+function ensureUploadDir() {
+  if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 type UtilityType = "gas" | "power" | "water";
 
@@ -144,6 +154,158 @@ export async function utilityRoutes(app: FastifyInstance): Promise<void> {
         .update(utilities)
         .set({ deletedAt: new Date() })
         .where(eq(utilities.id, id));
+
+      return reply.status(204).send();
+    },
+  });
+
+  // --- Utility Attachments ---
+
+  app.get("/utilities/attachments", {
+    handler: async (request, reply) => {
+      const rows = await db
+        .select()
+        .from(utilityAttachments)
+        .where(and(eq(utilityAttachments.userId, request.user.id), isNull(utilityAttachments.deletedAt)));
+      return reply.send(rows);
+    },
+  });
+
+  app.get<{ Params: { id: string } }>("/utilities/:id/attachments", {
+    schema: {
+      params: {
+        type: "object",
+        required: ["id"],
+        properties: { id: { type: "string", format: "uuid" } },
+      },
+    },
+    handler: async (request, reply) => {
+      const { id } = request.params;
+      const [utility] = await db
+        .select()
+        .from(utilities)
+        .where(and(eq(utilities.id, id), isNull(utilities.deletedAt)))
+        .limit(1);
+      if (!utility) return reply.status(404).send({ error: "not_found" });
+      if (utility.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
+
+      const rows = await db
+        .select()
+        .from(utilityAttachments)
+        .where(and(eq(utilityAttachments.utilityId, id), isNull(utilityAttachments.deletedAt)));
+      return reply.send(rows);
+    },
+  });
+
+  app.post<{ Params: { id: string } }>("/utilities/:id/attachments", {
+    handler: async (request, reply) => {
+      const { id } = request.params;
+      const [utility] = await db
+        .select()
+        .from(utilities)
+        .where(and(eq(utilities.id, id), isNull(utilities.deletedAt)))
+        .limit(1);
+      if (!utility) return reply.status(404).send({ error: "not_found" });
+      if (utility.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
+
+      const [existing] = await db
+        .select()
+        .from(utilityAttachments)
+        .where(and(eq(utilityAttachments.utilityId, id), isNull(utilityAttachments.deletedAt)))
+        .limit(1);
+      if (existing) {
+        const data = await request.file();
+        data?.file.resume();
+        return reply.status(409).send({ error: "already_exists", message: "An attachment already exists for this entry. Delete it first." });
+      }
+
+      const data = await request.file();
+      if (!data) return reply.status(400).send({ error: "no_file", message: "No file uploaded" });
+
+      if (data.mimetype !== "application/pdf") {
+        data.file.resume();
+        return reply.status(400).send({ error: "invalid_type", message: "Only PDF files are allowed" });
+      }
+
+      ensureUploadDir();
+      const storageKey = `${randomUUID()}.pdf`;
+      const dest = join(UPLOAD_DIR, storageKey);
+
+      let fileSize = 0;
+      const writeStream = createWriteStream(dest);
+      data.file.on("data", (chunk: Buffer) => { fileSize += chunk.length; });
+      await pipeline(data.file, writeStream);
+
+      const [attachment] = await db
+        .insert(utilityAttachments)
+        .values({
+          userId: request.user.id,
+          utilityId: id,
+          originalName: data.filename,
+          storageKey,
+          fileSize,
+        })
+        .returning();
+
+      return reply.status(201).send(attachment);
+    },
+  });
+
+  app.get<{ Params: { attachmentId: string } }>("/utilities/attachments/:attachmentId/content", {
+    schema: {
+      params: {
+        type: "object",
+        required: ["attachmentId"],
+        properties: { attachmentId: { type: "string", format: "uuid" } },
+      },
+    },
+    handler: async (request, reply) => {
+      const { attachmentId } = request.params;
+      const [attachment] = await db
+        .select()
+        .from(utilityAttachments)
+        .where(and(eq(utilityAttachments.id, attachmentId), isNull(utilityAttachments.deletedAt)))
+        .limit(1);
+      if (!attachment) return reply.status(404).send({ error: "not_found" });
+      if (attachment.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
+
+      const filePath = join(UPLOAD_DIR, attachment.storageKey);
+      if (!existsSync(filePath)) return reply.status(404).send({ error: "file_missing" });
+
+      return reply
+        .header("Content-Type", "application/pdf")
+        .header("Content-Disposition", `inline; filename="${attachment.originalName}"`)
+        .send(createReadStream(filePath));
+    },
+  });
+
+  app.delete<{ Params: { attachmentId: string } }>("/utilities/attachments/:attachmentId", {
+    schema: {
+      params: {
+        type: "object",
+        required: ["attachmentId"],
+        properties: { attachmentId: { type: "string", format: "uuid" } },
+      },
+    },
+    handler: async (request, reply) => {
+      const { attachmentId } = request.params;
+      const [attachment] = await db
+        .select()
+        .from(utilityAttachments)
+        .where(and(eq(utilityAttachments.id, attachmentId), isNull(utilityAttachments.deletedAt)))
+        .limit(1);
+      if (!attachment) return reply.status(404).send({ error: "not_found" });
+      if (attachment.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
+
+      await db
+        .update(utilityAttachments)
+        .set({ deletedAt: new Date() })
+        .where(eq(utilityAttachments.id, attachmentId));
+
+      const filePath = join(UPLOAD_DIR, attachment.storageKey);
+      if (existsSync(filePath)) {
+        try { unlinkSync(filePath); } catch { /* ignore cleanup errors */ }
+      }
 
       return reply.status(204).send();
     },

@@ -1,8 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useUtilities } from "../hooks/useUtilities.js";
 import { NavBar } from "../components/NavBar.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
-import type { Utility, UtilityType } from "../api/utilities.js";
+import type { Utility, UtilityType, UtilityAttachment } from "../api/utilities.js";
+import {
+  listAllUtilityAttachments,
+  uploadUtilityAttachment,
+  deleteUtilityAttachment,
+  fetchUtilityAttachmentBlob,
+} from "../api/utilities.js";
 import { getExchangeRates } from "../api/expenses.js";
 import { getSettings, SUPPORTED_CURRENCIES } from "../api/settings.js";
 
@@ -62,6 +68,12 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
   const [defaultCurrency, setDefaultCurrency] = useState("USD");
   const [rates, setRates] = useState<Record<string, number> | null>(null);
 
+  const [attachmentMap, setAttachmentMap] = useState<Record<string, UtilityAttachment>>({});
+  const [attachmentsUtility, setAttachmentsUtility] = useState<Utility | null>(null);
+  const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     getSettings()
       .then((s) => {
@@ -72,6 +84,14 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
 
     getExchangeRates()
       .then(({ rates }) => setRates(rates))
+      .catch(() => {});
+
+    listAllUtilityAttachments()
+      .then((list) => {
+        const map: Record<string, UtilityAttachment> = {};
+        for (const a of list) map[a.utilityId] = a;
+        setAttachmentMap(map);
+      })
       .catch(() => {});
   }, []);
 
@@ -137,6 +157,75 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
     return convertAmount(raw, u.currency ?? defaultCurrency, defaultCurrency, rates);
   }
 
+  function openAttachments(utility: Utility) {
+    setAttachmentsUtility(utility);
+    setAttachmentsError(null);
+  }
+
+  function closeAttachments() {
+    setAttachmentsUtility(null);
+    setAttachmentsError(null);
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !attachmentsUtility) return;
+    if (file.type !== "application/pdf") {
+      setAttachmentsError("Only PDF files are allowed.");
+      return;
+    }
+    setUploading(true);
+    setAttachmentsError(null);
+    try {
+      const attachment = await uploadUtilityAttachment(attachmentsUtility.id, file);
+      setAttachmentMap((prev) => ({ ...prev, [attachmentsUtility.id]: attachment }));
+    } catch (e) {
+      setAttachmentsError((e as Error).message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleDeleteAttachment(attachment: UtilityAttachment) {
+    try {
+      await deleteUtilityAttachment(attachment.id);
+      setAttachmentMap((prev) => {
+        const next = { ...prev };
+        delete next[attachment.utilityId];
+        return next;
+      });
+    } catch (e) {
+      setAttachmentsError((e as Error).message);
+    }
+  }
+
+  async function handleViewAttachment(attachment: UtilityAttachment) {
+    try {
+      const url = await fetchUtilityAttachmentBlob(attachment.id);
+      window.open(url, "_blank");
+    } catch (e) {
+      setAttachmentsError((e as Error).message);
+    }
+  }
+
+  async function handleViewAttachmentForUtility(utilityId: string) {
+    const attachment = attachmentMap[utilityId];
+    if (!attachment) return;
+    try {
+      const url = await fetchUtilityAttachmentBlob(attachment.id);
+      window.open(url, "_blank");
+    } catch {
+      // silently ignore — user can open the modal for details
+    }
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   return (
     <div style={styles.page}>
       <NavBar onLogout={onLogout} onNavigate={onNavigate} activePage="utilities" />
@@ -183,6 +272,7 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
                     <th style={{ ...styles.th, textAlign: "right" }}>Amount</th>
                     <th style={{ ...styles.th, textAlign: "right" }}>Service Days</th>
                     <th style={{ ...styles.th, textAlign: "right" }}>Per Day</th>
+                    <th style={{ ...styles.th, textAlign: "center" }}>Files</th>
                     <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
                   </tr>
                 </thead>
@@ -203,6 +293,28 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
                           </td>
                           <td style={{ ...styles.td, textAlign: "right" }}>{u.serviceDays}</td>
                           <td style={{ ...styles.td, textAlign: "right" }}>{fmt(perDay, defaultCurrency)}</td>
+                          <td style={{ ...styles.td, textAlign: "center" }}>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+                              <button
+                                style={styles.attachBtn}
+                                type="button"
+                                title={attachmentMap[u.id] ? "Replace or remove bill" : "Attach bill PDF"}
+                                onClick={() => openAttachments(u)}
+                              >
+                                📎
+                              </button>
+                              {attachmentMap[u.id] && (
+                                <button
+                                  style={styles.attachBtn}
+                                  type="button"
+                                  title={`View ${attachmentMap[u.id]!.originalName}`}
+                                  onClick={() => handleViewAttachmentForUtility(u.id)}
+                                >
+                                  👁
+                                </button>
+                              )}
+                            </div>
+                          </td>
                           <td style={{ ...styles.td, textAlign: "right" }}>
                             <button style={styles.actionBtn} type="button" onClick={() => openEdit(u)}>Edit</button>
                             <button
@@ -309,6 +421,69 @@ export function UtilitiesPage({ onLogout, onNavigate }: Props) {
           onCancel={() => setDeleting(null)}
         />
       )}
+
+      {/* Attachments Modal */}
+      {attachmentsUtility && (
+        <div style={styles.overlay}>
+          <div style={{ ...styles.modal, maxWidth: "480px" }}>
+            <h3 style={styles.modalTitle}>
+              Bill — {UTILITY_LABELS[attachmentsUtility.type]}
+            </h3>
+            <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "-0.75rem", marginBottom: "1.25rem" }}>
+              {attachmentsUtility.date}
+            </p>
+
+            {(() => {
+              const a = attachmentMap[attachmentsUtility.id];
+              if (a) {
+                return (
+                  <div style={styles.attachItem}>
+                    <div style={styles.attachInfo}>
+                      <span style={styles.attachName}>{a.originalName}</span>
+                      <span style={styles.attachMeta}>{formatFileSize(a.fileSize)}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button style={styles.actionBtn} type="button" onClick={() => handleViewAttachment(a)}>View</button>
+                      <button
+                        style={{ ...styles.actionBtn, ...styles.deleteBtn }}
+                        type="button"
+                        onClick={() => handleDeleteAttachment(a)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: "1rem" }}>
+                    No bill attached yet.
+                  </p>
+                  <label style={{ ...styles.label, marginBottom: 0 }}>
+                    <span>Attach a PDF bill</span>
+                    <input
+                      ref={fileInputRef}
+                      style={{ ...styles.input, cursor: "pointer" }}
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                    />
+                  </label>
+                  {uploading && <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "0.5rem" }}>Uploading…</p>}
+                </div>
+              );
+            })()}
+
+            {attachmentsError && <p style={{ ...styles.formError, marginTop: "0.75rem" }}>{attachmentsError}</p>}
+
+            <div style={{ ...styles.formActions, marginTop: "1.25rem" }}>
+              <button style={styles.cancelBtn} type="button" onClick={closeAttachments}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -395,4 +570,9 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "0.5rem 1.25rem", borderRadius: "8px", cursor: "pointer",
     fontSize: "0.9rem", fontWeight: 600,
   },
+  attachBtn: { background: "transparent", border: "none", fontSize: "1rem", cursor: "pointer", padding: "0.2rem 0.4rem", borderRadius: "4px", lineHeight: 1 },
+  attachItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem 0", borderBottom: "1px solid var(--border)" },
+  attachInfo: { display: "flex", flexDirection: "column" as const, gap: "0.15rem", minWidth: 0 },
+  attachName: { fontSize: "0.9rem", color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, maxWidth: "260px" },
+  attachMeta: { fontSize: "0.75rem", color: "var(--text-secondary)" },
 };

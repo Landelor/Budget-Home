@@ -167,6 +167,21 @@ export const utilities = pgTable("utilities", {
   deletedAt: timestamp("deleted_at"),
 });
 
+export const utilityAttachments = pgTable("utility_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  utilityId: uuid("utility_id")
+    .notNull()
+    .references(() => utilities.id, { onDelete: "cascade" }),
+  originalName: varchar("original_name", { length: 255 }).notNull(),
+  storageKey: varchar("storage_key", { length: 500 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
 export const refreshTokens = pgTable("refresh_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -186,6 +201,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   categories: many(categories),
   expenses: many(expenses),
   utilities: many(utilities),
+  utilityAttachments: many(utilityAttachments),
   incomePersons: many(incomePersons),
   incomes: many(incomes),
   refreshTokens: many(refreshTokens),
@@ -239,8 +255,14 @@ export const expensesRelations = relations(expenses, ({ one }) => ({
   user: one(users, { fields: [expenses.userId], references: [users.id] }),
 }));
 
-export const utilitiesRelations = relations(utilities, ({ one }) => ({
+export const utilitiesRelations = relations(utilities, ({ one, many }) => ({
   user: one(users, { fields: [utilities.userId], references: [users.id] }),
+  attachments: many(utilityAttachments),
+}));
+
+export const utilityAttachmentsRelations = relations(utilityAttachments, ({ one }) => ({
+  user: one(users, { fields: [utilityAttachments.userId], references: [users.id] }),
+  utility: one(utilities, { fields: [utilityAttachments.utilityId], references: [utilities.id] }),
 }));
 
 export const incomePersonsRelations = relations(incomePersons, ({ one, many }) => ({
@@ -281,6 +303,9 @@ export type NewExpense = typeof expenses.$inferInsert;
 
 export type Utility = typeof utilities.$inferSelect;
 export type NewUtility = typeof utilities.$inferInsert;
+
+export type UtilityAttachment = typeof utilityAttachments.$inferSelect;
+export type NewUtilityAttachment = typeof utilityAttachments.$inferInsert;
 
 export type IncomePerson = typeof incomePersons.$inferSelect;
 export type NewIncomePerson = typeof incomePersons.$inferInsert;
