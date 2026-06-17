@@ -4,7 +4,7 @@ import { useIncome } from "../hooks/useIncome.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 import type { Income, IncomePerson, IncomeAttachment } from "../api/income.js";
 import {
-  listIncomeAttachments,
+  listAllIncomeAttachments,
   uploadIncomeAttachment,
   deleteIncomeAttachment,
   fetchIncomeAttachmentBlob,
@@ -68,9 +68,8 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
 
   const [showPersonManager, setShowPersonManager] = useState(false);
 
+  const [attachmentMap, setAttachmentMap] = useState<Record<string, IncomeAttachment>>({});
   const [attachmentsIncome, setAttachmentsIncome] = useState<Income | null>(null);
-  const [attachments, setAttachments] = useState<IncomeAttachment[]>([]);
-  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,6 +91,13 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
       .catch(() => {});
     getExchangeRates()
       .then(({ rates }) => setRates(rates))
+      .catch(() => {});
+    listAllIncomeAttachments()
+      .then((list) => {
+        const map: Record<string, IncomeAttachment> = {};
+        for (const a of list) map[a.incomeId] = a;
+        setAttachmentMap(map);
+      })
       .catch(() => {});
   }, []);
 
@@ -178,24 +184,13 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
     return sortKey === "amount-desc" ? amtB - amtA : amtA - amtB;
   });
 
-  async function openAttachments(income: Income) {
+  function openAttachments(income: Income) {
     setAttachmentsIncome(income);
-    setAttachments([]);
     setAttachmentsError(null);
-    setAttachmentsLoading(true);
-    try {
-      const list = await listIncomeAttachments(income.id);
-      setAttachments(list);
-    } catch (e) {
-      setAttachmentsError((e as Error).message);
-    } finally {
-      setAttachmentsLoading(false);
-    }
   }
 
   function closeAttachments() {
     setAttachmentsIncome(null);
-    setAttachments([]);
     setAttachmentsError(null);
   }
 
@@ -210,7 +205,7 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
     setAttachmentsError(null);
     try {
       const attachment = await uploadIncomeAttachment(attachmentsIncome.id, file);
-      setAttachments((prev) => [...prev, attachment]);
+      setAttachmentMap((prev) => ({ ...prev, [attachmentsIncome.id]: attachment }));
     } catch (e) {
       setAttachmentsError((e as Error).message);
     } finally {
@@ -222,7 +217,11 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
   async function handleDeleteAttachment(attachment: IncomeAttachment) {
     try {
       await deleteIncomeAttachment(attachment.id);
-      setAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+      setAttachmentMap((prev) => {
+        const next = { ...prev };
+        delete next[attachment.incomeId];
+        return next;
+      });
     } catch (e) {
       setAttachmentsError((e as Error).message);
     }
@@ -234,6 +233,17 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
       window.open(url, "_blank");
     } catch (e) {
       setAttachmentsError((e as Error).message);
+    }
+  }
+
+  async function handleViewAttachmentForIncome(incomeId: string) {
+    const attachment = attachmentMap[incomeId];
+    if (!attachment) return;
+    try {
+      const url = await fetchIncomeAttachmentBlob(attachment.id);
+      window.open(url, "_blank");
+    } catch {
+      // silently ignore — user can open the modal for details
     }
   }
 
@@ -321,14 +331,26 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                         {cur !== defaultCurrency && <span style={styles.currencyTag}>{cur}</span>}
                       </td>
                       <td style={{ ...styles.td, textAlign: "center" }}>
-                        <button
-                          style={styles.attachBtn}
-                          type="button"
-                          title="Manage payslips"
-                          onClick={() => openAttachments(income)}
-                        >
-                          📎
-                        </button>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
+                          <button
+                            style={styles.attachBtn}
+                            type="button"
+                            title={attachmentMap[income.id] ? "Replace or remove payslip" : "Attach payslip"}
+                            onClick={() => openAttachments(income)}
+                          >
+                            📎
+                          </button>
+                          {attachmentMap[income.id] && (
+                            <button
+                              style={styles.attachBtn}
+                              type="button"
+                              title={`View ${attachmentMap[income.id]!.originalName}`}
+                              onClick={() => handleViewAttachmentForIncome(income.id)}
+                            >
+                              👁
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td style={{ ...styles.td, textAlign: "right" }}>
                         <button style={styles.actionBtn} type="button" onClick={() => openEdit(income)}>Edit</button>
@@ -516,36 +538,23 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
       {/* Attachments Modal */}
       {attachmentsIncome && (
         <div style={styles.overlay}>
-          <div style={{ ...styles.modal, maxWidth: "520px" }}>
-            <h3 style={styles.modalTitle}>Payslips — {attachmentsIncome.name}</h3>
-            <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "-0.75rem", marginBottom: "1rem" }}>
+          <div style={{ ...styles.modal, maxWidth: "480px" }}>
+            <h3 style={styles.modalTitle}>Payslip — {attachmentsIncome.name}</h3>
+            <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "-0.75rem", marginBottom: "1.25rem" }}>
               {attachmentsIncome.date}
             </p>
 
-            {attachmentsLoading && <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>Loading…</p>}
-
-            {!attachmentsLoading && attachments.length === 0 && (
-              <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: "1rem" }}>
-                No payslips attached yet.
-              </p>
-            )}
-
-            {!attachmentsLoading && attachments.length > 0 && (
-              <ul style={styles.attachList}>
-                {attachments.map((a) => (
-                  <li key={a.id} style={styles.attachItem}>
+            {(() => {
+              const a = attachmentMap[attachmentsIncome.id];
+              if (a) {
+                return (
+                  <div style={styles.attachItem}>
                     <div style={styles.attachInfo}>
                       <span style={styles.attachName}>{a.originalName}</span>
                       <span style={styles.attachMeta}>{formatFileSize(a.fileSize)}</span>
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem" }}>
-                      <button
-                        style={styles.actionBtn}
-                        type="button"
-                        onClick={() => handleViewAttachment(a)}
-                      >
-                        View
-                      </button>
+                      <button style={styles.actionBtn} type="button" onClick={() => handleViewAttachment(a)}>View</button>
                       <button
                         style={{ ...styles.actionBtn, ...styles.deleteBtn }}
                         type="button"
@@ -554,27 +563,31 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                         Delete
                       </button>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                  </div>
+                );
+              }
+              return (
+                <div>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: "1rem" }}>
+                    No payslip attached yet.
+                  </p>
+                  <label style={{ ...styles.label, marginBottom: 0 }}>
+                    <span>Attach a PDF payslip</span>
+                    <input
+                      ref={fileInputRef}
+                      style={{ ...styles.input, cursor: "pointer" }}
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                    />
+                  </label>
+                  {uploading && <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "0.5rem" }}>Uploading…</p>}
+                </div>
+              );
+            })()}
 
-            {attachmentsError && <p style={styles.formError}>{attachmentsError}</p>}
-
-            <div style={{ marginTop: "1rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
-              <label style={{ ...styles.label, marginBottom: 0 }}>
-                <span>Attach a PDF payslip</span>
-                <input
-                  ref={fileInputRef}
-                  style={{ ...styles.input, cursor: "pointer" }}
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                />
-              </label>
-              {uploading && <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "0.5rem" }}>Uploading…</p>}
-            </div>
+            {attachmentsError && <p style={{ ...styles.formError, marginTop: "0.75rem" }}>{attachmentsError}</p>}
 
             <div style={{ ...styles.formActions, marginTop: "1.25rem" }}>
               <button style={styles.cancelBtn} type="button" onClick={closeAttachments}>Close</button>

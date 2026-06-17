@@ -240,6 +240,16 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
 
   // --- Income Attachments ---
 
+  app.get("/income/attachments", {
+    handler: async (request, reply) => {
+      const rows = await db
+        .select()
+        .from(incomeAttachments)
+        .where(and(eq(incomeAttachments.userId, request.user.id), isNull(incomeAttachments.deletedAt)));
+      return reply.send(rows);
+    },
+  });
+
   app.get<{ Params: { id: string } }>("/income/:id/attachments", {
     schema: {
       params: {
@@ -276,6 +286,17 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
         .limit(1);
       if (!income) return reply.status(404).send({ error: "not_found" });
       if (income.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
+
+      const [existing] = await db
+        .select()
+        .from(incomeAttachments)
+        .where(and(eq(incomeAttachments.incomeId, id), isNull(incomeAttachments.deletedAt)))
+        .limit(1);
+      if (existing) {
+        const data = await request.file();
+        data?.file.resume();
+        return reply.status(409).send({ error: "already_exists", message: "An attachment already exists for this entry. Delete it first." });
+      }
 
       const data = await request.file();
       if (!data) return reply.status(400).send({ error: "no_file", message: "No file uploaded" });

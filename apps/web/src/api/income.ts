@@ -68,6 +68,10 @@ export function deleteIncome(id: string): Promise<void> {
   return apiFetch<void>(`/income/${id}`, { method: "DELETE" });
 }
 
+export function listAllIncomeAttachments(): Promise<IncomeAttachment[]> {
+  return apiFetch<IncomeAttachment[]>("/income/attachments");
+}
+
 export function listIncomeAttachments(incomeId: string): Promise<IncomeAttachment[]> {
   return apiFetch<IncomeAttachment[]>(`/income/${incomeId}/attachments`);
 }
