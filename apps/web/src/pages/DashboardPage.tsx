@@ -6,8 +6,8 @@ import type { Utility, UtilityType } from "../api/utilities.js";
 import { getExchangeRates } from "../api/expenses.js";
 import type { ExpenseFrequency } from "../api/expenses.js";
 import { getSettings } from "../api/settings.js";
-import { listIncomes } from "../api/income.js";
-import type { Income } from "../api/income.js";
+import { listIncomes, listIncomePersons } from "../api/income.js";
+import type { Income, IncomePerson } from "../api/income.js";
 
 interface OffsetItem {
   id: string;
@@ -64,6 +64,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
   const [ratesDate, setRatesDate] = useState<string | null>(null);
   const [utilities, setUtilities] = useState<Utility[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
+  const [incomePersons, setIncomePersons] = useState<IncomePerson[]>([]);
   const [loading, setLoading] = useState(true);
 
   const offsetItems = loadOffsetItems();
@@ -79,6 +80,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
         .catch(() => {}),
       listUtilities().then(setUtilities).catch(() => {}),
       listIncomes().then(setIncomes).catch(() => {}),
+      listIncomePersons().then(setIncomePersons).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -115,18 +117,22 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
     ),
   ];
 
-  const { avgIncomePerPerson, avgIncomePersonCount } = (() => {
-    const personTotals: Record<string, number> = {};
+  const avgIncomeByPerson: { id: string; name: string; avg: number; count: number }[] = (() => {
+    const personMap = Object.fromEntries(incomePersons.map((p) => [p.id, p.name]));
+    const totals: Record<string, { sum: number; count: number }> = {};
     for (const inc of incomes) {
       if (!inc.personId) continue;
       const cur = inc.currency ?? defaultCurrency;
       const amount = parseFloat(inc.amount);
       const converted = rates ? convertAmount(amount, cur, defaultCurrency, rates) : amount;
-      personTotals[inc.personId] = (personTotals[inc.personId] ?? 0) + converted;
+      const entry = totals[inc.personId] ?? { sum: 0, count: 0 };
+      entry.sum += converted;
+      entry.count += 1;
+      totals[inc.personId] = entry;
     }
-    const count = Object.keys(personTotals).length;
-    const avg = count === 0 ? null : Object.values(personTotals).reduce((a, b) => a + b, 0) / count;
-    return { avgIncomePerPerson: avg, avgIncomePersonCount: count };
+    return Object.entries(totals)
+      .map(([id, { sum, count }]) => ({ id, name: personMap[id] ?? id, avg: sum / count, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   })();
 
   const isLoading = loading || expensesLoading;
@@ -147,16 +153,6 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
                 <p style={styles.summarySubLabel}>per week</p>
               </div>
 
-              {avgIncomePerPerson !== null && (
-                <div style={styles.summaryCard}>
-                  <p style={styles.summaryLabel}>Avg Income / Person</p>
-                  <p style={styles.summaryValue}>{fmt(avgIncomePerPerson, defaultCurrency)}</p>
-                  <p style={styles.summarySubLabel}>
-                    across {avgIncomePersonCount} {avgIncomePersonCount === 1 ? "person" : "people"}
-                  </p>
-                </div>
-              )}
-
               {(["gas", "power", "water"] as UtilityType[]).map((type) => {
                 const stats = utilityStats(type);
                 if (!stats) return null;
@@ -172,6 +168,26 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
                 );
               })}
             </div>
+
+            {avgIncomeByPerson.length > 0 && (
+              <div style={styles.ratesCard}>
+                <div style={styles.ratesCardHeader}>
+                  <span style={styles.ratesCardTitle}>Avg Income Per Person</span>
+                  <span style={styles.ratesCardDate}>average entry amount · {defaultCurrency}</span>
+                </div>
+                <div style={styles.incomePersonList}>
+                  {avgIncomeByPerson.map(({ id, name, avg, count }) => (
+                    <div key={id} style={styles.incomePersonRow}>
+                      <span style={styles.incomePersonName}>{name}</span>
+                      <span style={styles.incomePersonAvg}>{fmt(avg, defaultCurrency)}</span>
+                      <span style={styles.incomePersonCount}>
+                        {count} {count === 1 ? "entry" : "entries"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {foreignCurrencies.length > 0 && rates && (
               <div style={styles.ratesCard}>
@@ -306,5 +322,35 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-secondary)",
     textAlign: "center",
     padding: "3rem 0",
+  },
+  incomePersonList: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "0.5rem",
+  },
+  incomePersonRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.75rem",
+    padding: "0.5rem 0.75rem",
+    background: "var(--bg-page)",
+    border: "1px solid var(--border)",
+    borderRadius: "8px",
+    fontSize: "0.875rem",
+  },
+  incomePersonName: {
+    flex: 1,
+    fontWeight: 600,
+    color: "var(--text-primary)",
+  },
+  incomePersonAvg: {
+    fontWeight: 700,
+    color: "var(--text-primary)",
+  },
+  incomePersonCount: {
+    fontSize: "0.75rem",
+    color: "var(--text-secondary)",
+    minWidth: "56px",
+    textAlign: "right" as const,
   },
 };
