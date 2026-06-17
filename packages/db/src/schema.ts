@@ -138,6 +138,21 @@ export const incomes = pgTable("incomes", {
   deletedAt: timestamp("deleted_at"),
 });
 
+export const incomeAttachments = pgTable("income_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  incomeId: uuid("income_id")
+    .notNull()
+    .references(() => incomes.id, { onDelete: "cascade" }),
+  originalName: varchar("original_name", { length: 255 }).notNull(),
+  storageKey: varchar("storage_key", { length: 500 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
 export const utilities = pgTable("utilities", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -233,9 +248,15 @@ export const incomePersonsRelations = relations(incomePersons, ({ one, many }) =
   incomes: many(incomes),
 }));
 
-export const incomesRelations = relations(incomes, ({ one }) => ({
+export const incomesRelations = relations(incomes, ({ one, many }) => ({
   user: one(users, { fields: [incomes.userId], references: [users.id] }),
   person: one(incomePersons, { fields: [incomes.personId], references: [incomePersons.id] }),
+  attachments: many(incomeAttachments),
+}));
+
+export const incomeAttachmentsRelations = relations(incomeAttachments, ({ one }) => ({
+  user: one(users, { fields: [incomeAttachments.userId], references: [users.id] }),
+  income: one(incomes, { fields: [incomeAttachments.incomeId], references: [incomes.id] }),
 }));
 
 // Inferred TypeScript types
@@ -266,6 +287,9 @@ export type NewIncomePerson = typeof incomePersons.$inferInsert;
 
 export type Income = typeof incomes.$inferSelect;
 export type NewIncome = typeof incomes.$inferInsert;
+
+export type IncomeAttachment = typeof incomeAttachments.$inferSelect;
+export type NewIncomeAttachment = typeof incomeAttachments.$inferInsert;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;

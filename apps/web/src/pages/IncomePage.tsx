@@ -1,8 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NavBar } from "../components/NavBar.js";
 import { useIncome } from "../hooks/useIncome.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
-import type { Income, IncomePerson } from "../api/income.js";
+import type { Income, IncomePerson, IncomeAttachment } from "../api/income.js";
+import {
+  listIncomeAttachments,
+  uploadIncomeAttachment,
+  deleteIncomeAttachment,
+  fetchIncomeAttachmentBlob,
+} from "../api/income.js";
 import { getExchangeRates } from "../api/expenses.js";
 import { getSettings, SUPPORTED_CURRENCIES } from "../api/settings.js";
 
@@ -61,6 +67,13 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
   const [personSubmitting, setPersonSubmitting] = useState(false);
 
   const [showPersonManager, setShowPersonManager] = useState(false);
+
+  const [attachmentsIncome, setAttachmentsIncome] = useState<Income | null>(null);
+  const [attachments, setAttachments] = useState<IncomeAttachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [sortKey, setSortKey] = useState<SortKey>(() => {
     const saved = localStorage.getItem("income-sort-key");
@@ -165,6 +178,71 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
     return sortKey === "amount-desc" ? amtB - amtA : amtA - amtB;
   });
 
+  async function openAttachments(income: Income) {
+    setAttachmentsIncome(income);
+    setAttachments([]);
+    setAttachmentsError(null);
+    setAttachmentsLoading(true);
+    try {
+      const list = await listIncomeAttachments(income.id);
+      setAttachments(list);
+    } catch (e) {
+      setAttachmentsError((e as Error).message);
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  }
+
+  function closeAttachments() {
+    setAttachmentsIncome(null);
+    setAttachments([]);
+    setAttachmentsError(null);
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !attachmentsIncome) return;
+    if (file.type !== "application/pdf") {
+      setAttachmentsError("Only PDF files are allowed.");
+      return;
+    }
+    setUploading(true);
+    setAttachmentsError(null);
+    try {
+      const attachment = await uploadIncomeAttachment(attachmentsIncome.id, file);
+      setAttachments((prev) => [...prev, attachment]);
+    } catch (e) {
+      setAttachmentsError((e as Error).message);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleDeleteAttachment(attachment: IncomeAttachment) {
+    try {
+      await deleteIncomeAttachment(attachment.id);
+      setAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+    } catch (e) {
+      setAttachmentsError((e as Error).message);
+    }
+  }
+
+  async function handleViewAttachment(attachment: IncomeAttachment) {
+    try {
+      const url = await fetchIncomeAttachmentBlob(attachment.id);
+      window.open(url, "_blank");
+    } catch (e) {
+      setAttachmentsError((e as Error).message);
+    }
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   return (
     <div style={styles.page}>
       <NavBar onLogout={onLogout} onNavigate={onNavigate} activePage="income" />
@@ -218,6 +296,7 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                   <th style={styles.th}>Person</th>
                   <th style={styles.th}>Name</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>Amount ({defaultCurrency})</th>
+                  <th style={{ ...styles.th, textAlign: "center" }}>Files</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
@@ -240,6 +319,16 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
                       <td style={{ ...styles.td, textAlign: "right" }}>
                         {fmt(convertedAmount, defaultCurrency)}
                         {cur !== defaultCurrency && <span style={styles.currencyTag}>{cur}</span>}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: "center" }}>
+                        <button
+                          style={styles.attachBtn}
+                          type="button"
+                          title="Manage payslips"
+                          onClick={() => openAttachments(income)}
+                        >
+                          📎
+                        </button>
                       </td>
                       <td style={{ ...styles.td, textAlign: "right" }}>
                         <button style={styles.actionBtn} type="button" onClick={() => openEdit(income)}>Edit</button>
@@ -423,6 +512,76 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
           onCancel={() => setDeletingPerson(null)}
         />
       )}
+
+      {/* Attachments Modal */}
+      {attachmentsIncome && (
+        <div style={styles.overlay}>
+          <div style={{ ...styles.modal, maxWidth: "520px" }}>
+            <h3 style={styles.modalTitle}>Payslips — {attachmentsIncome.name}</h3>
+            <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginTop: "-0.75rem", marginBottom: "1rem" }}>
+              {attachmentsIncome.date}
+            </p>
+
+            {attachmentsLoading && <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>Loading…</p>}
+
+            {!attachmentsLoading && attachments.length === 0 && (
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: "1rem" }}>
+                No payslips attached yet.
+              </p>
+            )}
+
+            {!attachmentsLoading && attachments.length > 0 && (
+              <ul style={styles.attachList}>
+                {attachments.map((a) => (
+                  <li key={a.id} style={styles.attachItem}>
+                    <div style={styles.attachInfo}>
+                      <span style={styles.attachName}>{a.originalName}</span>
+                      <span style={styles.attachMeta}>{formatFileSize(a.fileSize)}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        style={styles.actionBtn}
+                        type="button"
+                        onClick={() => handleViewAttachment(a)}
+                      >
+                        View
+                      </button>
+                      <button
+                        style={{ ...styles.actionBtn, ...styles.deleteBtn }}
+                        type="button"
+                        onClick={() => handleDeleteAttachment(a)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {attachmentsError && <p style={styles.formError}>{attachmentsError}</p>}
+
+            <div style={{ marginTop: "1rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
+              <label style={{ ...styles.label, marginBottom: 0 }}>
+                <span>Attach a PDF payslip</span>
+                <input
+                  ref={fileInputRef}
+                  style={{ ...styles.input, cursor: "pointer" }}
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                />
+              </label>
+              {uploading && <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginTop: "0.5rem" }}>Uploading…</p>}
+            </div>
+
+            <div style={{ ...styles.formActions, marginTop: "1.25rem" }}>
+              <button style={styles.cancelBtn} type="button" onClick={closeAttachments}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -472,4 +631,10 @@ const styles: Record<string, React.CSSProperties> = {
   submitBtn: { background: "#16a34a", color: "#fff", border: "none", padding: "0.5rem 1.25rem", borderRadius: "8px", cursor: "pointer", fontSize: "0.9rem", fontWeight: 600 },
   personList: { listStyle: "none", margin: "0 0 0.5rem", padding: 0 },
   personItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--border)" },
+  attachBtn: { background: "transparent", border: "none", fontSize: "1rem", cursor: "pointer", padding: "0.2rem 0.4rem", borderRadius: "4px", lineHeight: 1 },
+  attachList: { listStyle: "none", margin: "0 0 0.75rem", padding: 0 },
+  attachItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.6rem 0", borderBottom: "1px solid var(--border)" },
+  attachInfo: { display: "flex", flexDirection: "column" as const, gap: "0.15rem", minWidth: 0 },
+  attachName: { fontSize: "0.9rem", color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, maxWidth: "260px" },
+  attachMeta: { fontSize: "0.75rem", color: "var(--text-secondary)" },
 };

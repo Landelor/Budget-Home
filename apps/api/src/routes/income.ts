@@ -1,7 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import { db, incomes, incomePersons } from "@budgetapp/db";
+import { db, incomes, incomePersons, incomeAttachments } from "@budgetapp/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { authenticate } from "../middleware/authenticate.js";
+import { randomUUID } from "node:crypto";
+import { createWriteStream, createReadStream, existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { pipeline } from "node:stream/promises";
 
 type IncomeFrequency = "fortnightly" | "monthly" | "yearly";
 
@@ -9,6 +13,12 @@ const SUPPORTED_CURRENCIES = [
   "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR", "BRL",
   "MXN", "SGD", "HKD", "NOK", "SEK", "DKK", "NZD", "ZAR", "KRW", "TRY",
 ];
+
+const UPLOAD_DIR = process.env["UPLOAD_DIR"] ?? join(process.cwd(), "uploads");
+
+function ensureUploadDir() {
+  if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 export async function incomeRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
@@ -224,6 +234,135 @@ export async function incomeRoutes(app: FastifyInstance): Promise<void> {
       if (existing.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
 
       await db.update(incomes).set({ deletedAt: new Date() }).where(eq(incomes.id, id));
+      return reply.status(204).send();
+    },
+  });
+
+  // --- Income Attachments ---
+
+  app.get<{ Params: { id: string } }>("/income/:id/attachments", {
+    schema: {
+      params: {
+        type: "object",
+        required: ["id"],
+        properties: { id: { type: "string", format: "uuid" } },
+      },
+    },
+    handler: async (request, reply) => {
+      const { id } = request.params;
+      const [income] = await db
+        .select()
+        .from(incomes)
+        .where(and(eq(incomes.id, id), isNull(incomes.deletedAt)))
+        .limit(1);
+      if (!income) return reply.status(404).send({ error: "not_found" });
+      if (income.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
+
+      const rows = await db
+        .select()
+        .from(incomeAttachments)
+        .where(and(eq(incomeAttachments.incomeId, id), isNull(incomeAttachments.deletedAt)));
+      return reply.send(rows);
+    },
+  });
+
+  app.post<{ Params: { id: string } }>("/income/:id/attachments", {
+    handler: async (request, reply) => {
+      const { id } = request.params;
+      const [income] = await db
+        .select()
+        .from(incomes)
+        .where(and(eq(incomes.id, id), isNull(incomes.deletedAt)))
+        .limit(1);
+      if (!income) return reply.status(404).send({ error: "not_found" });
+      if (income.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
+
+      const data = await request.file();
+      if (!data) return reply.status(400).send({ error: "no_file", message: "No file uploaded" });
+
+      if (data.mimetype !== "application/pdf") {
+        data.file.resume();
+        return reply.status(400).send({ error: "invalid_type", message: "Only PDF files are allowed" });
+      }
+
+      ensureUploadDir();
+      const storageKey = `${randomUUID()}.pdf`;
+      const dest = join(UPLOAD_DIR, storageKey);
+
+      await pipeline(data.file, createWriteStream(dest));
+
+      const fileSize = data.file.bytesRead;
+      const [attachment] = await db
+        .insert(incomeAttachments)
+        .values({
+          userId: request.user.id,
+          incomeId: id,
+          originalName: data.filename,
+          storageKey,
+          fileSize,
+        })
+        .returning();
+
+      return reply.status(201).send(attachment);
+    },
+  });
+
+  app.get<{ Params: { attachmentId: string } }>("/income/attachments/:attachmentId/content", {
+    schema: {
+      params: {
+        type: "object",
+        required: ["attachmentId"],
+        properties: { attachmentId: { type: "string", format: "uuid" } },
+      },
+    },
+    handler: async (request, reply) => {
+      const { attachmentId } = request.params;
+      const [attachment] = await db
+        .select()
+        .from(incomeAttachments)
+        .where(and(eq(incomeAttachments.id, attachmentId), isNull(incomeAttachments.deletedAt)))
+        .limit(1);
+      if (!attachment) return reply.status(404).send({ error: "not_found" });
+      if (attachment.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
+
+      const filePath = join(UPLOAD_DIR, attachment.storageKey);
+      if (!existsSync(filePath)) return reply.status(404).send({ error: "file_missing" });
+
+      return reply
+        .header("Content-Type", "application/pdf")
+        .header("Content-Disposition", `inline; filename="${attachment.originalName}"`)
+        .send(createReadStream(filePath));
+    },
+  });
+
+  app.delete<{ Params: { attachmentId: string } }>("/income/attachments/:attachmentId", {
+    schema: {
+      params: {
+        type: "object",
+        required: ["attachmentId"],
+        properties: { attachmentId: { type: "string", format: "uuid" } },
+      },
+    },
+    handler: async (request, reply) => {
+      const { attachmentId } = request.params;
+      const [attachment] = await db
+        .select()
+        .from(incomeAttachments)
+        .where(and(eq(incomeAttachments.id, attachmentId), isNull(incomeAttachments.deletedAt)))
+        .limit(1);
+      if (!attachment) return reply.status(404).send({ error: "not_found" });
+      if (attachment.userId !== request.user.id) return reply.status(403).send({ error: "forbidden" });
+
+      await db
+        .update(incomeAttachments)
+        .set({ deletedAt: new Date() })
+        .where(eq(incomeAttachments.id, attachmentId));
+
+      const filePath = join(UPLOAD_DIR, attachment.storageKey);
+      if (existsSync(filePath)) {
+        try { unlinkSync(filePath); } catch { /* ignore cleanup errors */ }
+      }
+
       return reply.status(204).send();
     },
   });

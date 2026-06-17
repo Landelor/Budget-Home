@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import multipart from "@fastify/multipart";
 import { healthRoutes } from "./routes/health.js";
 import { helloRoutes } from "./routes/hello.js";
 import { authRoutes } from "./routes/auth.js";
@@ -29,6 +30,10 @@ export async function buildApp() {
 
   await app.register(rateLimit, {
     global: false,
+  });
+
+  await app.register(multipart, {
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   });
 
   await app.register(healthRoutes);
