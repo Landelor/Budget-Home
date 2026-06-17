@@ -66,6 +66,14 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [incomePersons, setIncomePersons] = useState<IncomePerson[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fireExtPct, setFireExtPct] = useState<number>(() => {
+    const saved = localStorage.getItem("dashboard-fire-ext-pct");
+    return saved ? parseInt(saved, 10) : 10;
+  });
+  const [smilePct, setSmilePct] = useState<number>(() => {
+    const saved = localStorage.getItem("dashboard-smile-pct");
+    return saved ? parseInt(saved, 10) : 10;
+  });
 
   const offsetItems = loadOffsetItems();
 
@@ -135,6 +143,8 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
       .sort((a, b) => a.name.localeCompare(b.name));
   })();
 
+  const totalAvgIncome = avgIncomeByPerson.reduce((sum, p) => sum + p.avg, 0);
+
   const isLoading = loading || expensesLoading;
 
   return (
@@ -182,6 +192,43 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
                       <span style={styles.incomePersonAvg}>{fmt(avg, defaultCurrency)}</span>
                       <span style={styles.incomePersonCount}>
                         {count} {count === 1 ? "entry" : "entries"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {avgIncomeByPerson.length > 0 && (
+              <div style={styles.ratesCard}>
+                <div style={styles.ratesCardHeader}>
+                  <span style={styles.ratesCardTitle}>Allocation</span>
+                  <span style={styles.ratesCardDate}>% of combined avg income</span>
+                </div>
+                <div style={styles.incomePersonList}>
+                  {(
+                    [
+                      { label: "Fire Extinguisher", pct: fireExtPct, key: "dashboard-fire-ext-pct", set: setFireExtPct },
+                      { label: "Smile", pct: smilePct, key: "dashboard-smile-pct", set: setSmilePct },
+                    ] as const
+                  ).map(({ label, pct, key, set }) => (
+                    <div key={label} style={styles.allocationRow}>
+                      <span style={styles.incomePersonName}>{label}</span>
+                      <select
+                        style={styles.pctSelect}
+                        value={pct}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          localStorage.setItem(key, String(v));
+                          set(v);
+                        }}
+                      >
+                        {[10, 20, 30, 40, 50, 60, 70, 80].map((p) => (
+                          <option key={p} value={p}>{p}%</option>
+                        ))}
+                      </select>
+                      <span style={styles.incomePersonAvg}>
+                        {fmt((totalAvgIncome * pct) / 100, defaultCurrency)}
                       </span>
                     </div>
                   ))}
@@ -352,5 +399,24 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--text-secondary)",
     minWidth: "56px",
     textAlign: "right" as const,
+  },
+  allocationRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.75rem",
+    padding: "0.5rem 0.75rem",
+    background: "var(--bg-page)",
+    border: "1px solid var(--border)",
+    borderRadius: "8px",
+    fontSize: "0.875rem",
+  },
+  pctSelect: {
+    padding: "0.3rem 0.5rem",
+    borderRadius: "6px",
+    border: "1px solid var(--border)",
+    fontSize: "0.85rem",
+    background: "var(--bg-page)",
+    color: "var(--text-primary)",
+    cursor: "pointer",
   },
 };
