@@ -1,0 +1,44 @@
+{
+  "name": "Budget-Home",
+  "slug": "budget-home",
+  "categories": [
+    "Finance",
+    "Homelab"
+  ],
+  "date_created": "2026-06-18",
+  "type": "ct",
+  "updateable": true,
+  "privileged": false,
+  "interface_port": 80,
+  "documentation": "https://github.com/Landelor/Budget-Home#readme",
+  "website": "https://github.com/Landelor/Budget-Home",
+  "logo": "https://raw.githubusercontent.com/Landelor/Budget-Home/main/apps/web/public/favicon.ico",
+  "description": "Budget-Home is a self-hosted home budgeting application. It tracks income, expenses, and utility bills with PDF attachment support. Built on Node.js (Fastify) and React with PostgreSQL for storage.",
+  "install_methods": [
+    {
+      "type": "default",
+      "script": "ct/budget-home.sh",
+      "resources": {
+        "cpu": 2,
+        "ram": 1024,
+        "hdd": 8,
+        "os": "debian",
+        "version": "12"
+      }
+    }
+  ],
+  "default_credentials": {
+    "username": null,
+    "password": null
+  },
+  "notes": [
+    {
+      "text": "DB credentials and JWT secret are auto-generated on first install and stored in /opt/Budget-Home/apps/api/.env",
+      "type": "info"
+    },
+    {
+      "text": "To update an existing installation, run: bash /opt/Budget-Home/scripts/proxmox/install/budget-home-update.sh",
+      "type": "info"
+    }
+  ]
+}

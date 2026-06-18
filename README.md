@@ -87,8 +87,55 @@ cd packages/db && npm run db:migrate
 
 See `apps/api/.env.example` for the full list. Key variables:
 
-| Variable       | Default                                            | Description           |
-| -------------- | -------------------------------------------------- | --------------------- |
-| `DATABASE_URL` | `postgres://budgetapp:budgetapp@localhost:5432/budgetapp` | Postgres connection   |
-| `PORT`         | `3000`                                             | API port              |
-| `CORS_ORIGIN`  | `http://localhost:5173`                            | Allowed CORS origin   |
+| Variable          | Default                                                   | Description                  |
+| ----------------- | --------------------------------------------------------- | ---------------------------- |
+| `DATABASE_URL`    | `postgres://budgetapp:budgetapp@localhost:5432/budgetapp` | Postgres connection          |
+| `PORT`            | `3000`                                                    | API port                     |
+| `CORS_ORIGIN`     | `http://localhost:5173`                                   | Allowed CORS origin          |
+| `JWT_SECRET`      | *(required)*                                              | Secret for signing JWTs      |
+| `FRONTEND_ORIGIN` | `http://localhost:5173`                                   | Displayed in API health info |
+
+## Deployment — Proxmox LXC
+
+The `scripts/proxmox/` directory contains community-scripts-style tooling for running Budget-Home on a **Proxmox VE** LXC container.
+
+### Fresh install (run on Proxmox host)
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Landelor/Budget-Home/main/scripts/proxmox/ct/budget-home.sh)"
+```
+
+This creates a Debian 12 LXC (2 vCPU, 1 GB RAM, 8 GB disk), then runs the install script inside it automatically.
+
+### Manual install (run inside an existing LXC / Debian 12 VM)
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Landelor/Budget-Home/main/scripts/proxmox/install/budget-home-install.sh)"
+```
+
+What the install script does:
+- Installs Node.js 20, PostgreSQL 16, nginx
+- Clones this repo to `/opt/Budget-Home`
+- Runs `npm ci` and `npm run build`
+- Creates the `budgetapp` PostgreSQL user and database
+- Runs all Drizzle migrations
+- Writes `/opt/Budget-Home/apps/api/.env` with auto-generated secrets
+- Registers `budget-home-api` as a systemd service
+- Configures nginx to proxy `/api/` to Fastify and serve the Vite static build
+
+### Update an existing installation (run inside the LXC)
+
+```bash
+bash /opt/Budget-Home/scripts/proxmox/install/budget-home-update.sh
+```
+
+Pulls the latest `main`, rebuilds, runs any new migrations, and restarts services. Prints the previous and new version on completion.
+
+### Script reference
+
+| File | Runs on | Purpose |
+| ---- | ------- | ------- |
+| `scripts/proxmox/ct/budget-home.sh` | Proxmox host | Creates LXC container + triggers install |
+| `scripts/proxmox/install/budget-home-install.sh` | Inside LXC | Full first-time install |
+| `scripts/proxmox/install/budget-home-update.sh` | Inside LXC | In-place update |
+| `scripts/proxmox/ct/budget-home.json` | — | Community-scripts metadata |
