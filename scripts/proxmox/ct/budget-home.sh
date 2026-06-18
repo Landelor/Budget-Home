@@ -98,6 +98,25 @@ if [ -z "$HOSTNAME" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Root password (blank = passwordless login)
+# ---------------------------------------------------------------------------
+ROOT_PASS="${BUDGET_HOME_ROOT_PASS-__prompt__}"   # "__prompt__" sentinel = not set via env
+if [ "$ROOT_PASS" = "__prompt__" ]; then
+  printf "  Root password (leave blank for passwordless login): "
+  read -rs ROOT_PASS
+  printf "\n"
+  if [ -n "$ROOT_PASS" ]; then
+    printf "  Confirm password: "
+    read -rs ROOT_PASS_CONFIRM
+    printf "\n"
+    if [ "$ROOT_PASS" != "$ROOT_PASS_CONFIRM" ]; then
+      printf "  ${RD}Passwords do not match.${CL}\n"
+      exit 1
+    fi
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Timezone
 # ---------------------------------------------------------------------------
 TIMEZONE="${BUDGET_HOME_TZ:-}"
@@ -182,6 +201,7 @@ cat <<EOF
   ─────────────────────────────────────
   CTID:          ${GN}${CTID}${CL}
   Hostname:      ${GN}${HOSTNAME}${CL}
+  Root login:    ${GN}$([ -n "$ROOT_PASS" ] && echo "password set" || echo "passwordless")${CL}
   Timezone:      ${GN}${TIMEZONE}${CL}
   vCPU:          ${GN}${CORES}${CL}
   RAM:           ${GN}${RAM} MB${CL}
@@ -238,6 +258,26 @@ for i in $(seq 1 15); do
   sleep 2
 done
 msg_ok "Container started"
+
+# ---------------------------------------------------------------------------
+# Set root password / passwordless login
+# ---------------------------------------------------------------------------
+msg_info "Configuring root login"
+if [ -n "$ROOT_PASS" ]; then
+  pct exec "${CTID}" -- bash -c "echo 'root:${ROOT_PASS}' | chpasswd"
+  msg_ok "Root password set"
+else
+  # Remove password requirement and allow blank-password SSH logins
+  pct exec "${CTID}" -- passwd -d root >/dev/null 2>&1
+  pct exec "${CTID}" -- bash -c "
+    sed -i 's/^#*PermitEmptyPasswords.*/PermitEmptyPasswords yes/' /etc/ssh/sshd_config
+    grep -q 'PermitEmptyPasswords yes' /etc/ssh/sshd_config || echo 'PermitEmptyPasswords yes' >> /etc/ssh/sshd_config
+    sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+    grep -q 'PermitRootLogin yes' /etc/ssh/sshd_config || echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
+    systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
+  "
+  msg_ok "Passwordless root login enabled"
+fi
 
 # ---------------------------------------------------------------------------
 # Run install script inside the container
