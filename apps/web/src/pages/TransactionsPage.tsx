@@ -8,6 +8,8 @@ import {
   deleteTransaction,
   type Transaction,
 } from "../api/transactions.js";
+import { getSettings } from "../api/settings.js";
+import { NavBar } from "../components/NavBar.js";
 import { TransactionForm } from "../components/TransactionForm.js";
 import { FilterBar, type Filters } from "../components/FilterBar.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
@@ -68,12 +70,14 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [dateFormat, setDateFormat] = useState<"MDY" | "DMY">("MDY");
 
   useEffect(() => {
-    Promise.all([listAccounts(), listCategories()])
-      .then(([accs, cats]) => {
+    Promise.all([listAccounts(), listCategories(), getSettings()])
+      .then(([accs, cats, settings]) => {
         setAccounts(accs);
         setCategories(cats);
+        setDateFormat(settings.dateFormat ?? "MDY");
       })
       .catch((e) => console.error("Failed to load accounts/categories:", e));
   }, []);
@@ -154,38 +158,7 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <h1 style={styles.heading}>BudgetApp</h1>
-        <nav style={styles.nav}>
-          <button
-            style={styles.navBtn}
-            type="button"
-            onClick={() => onNavigate("dashboard")}
-          >
-            Dashboard
-          </button>
-          <button style={{ ...styles.navBtn, ...styles.navBtnActive }} type="button">
-            Transactions
-          </button>
-          <button
-            style={styles.navBtn}
-            type="button"
-            onClick={() => onNavigate("accounts")}
-          >
-            Accounts
-          </button>
-          <button
-            style={styles.navBtn}
-            type="button"
-            onClick={() => onNavigate("settings")}
-          >
-            Settings
-          </button>
-        </nav>
-        <button onClick={onLogout} style={styles.logoutBtn} type="button">
-          Sign out
-        </button>
-      </header>
+      <NavBar onLogout={onLogout} onNavigate={onNavigate} activePage="transactions" />
 
       <main style={styles.main}>
         <div style={styles.titleRow}>
@@ -328,6 +301,7 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
           accounts={accounts}
           onDone={handleImportDone}
           onCancel={() => setShowImport(false)}
+          dateFormat={dateFormat}
         />
       )}
     </div>
@@ -337,50 +311,8 @@ export function TransactionsPage({ onLogout, onNavigate }: Props) {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f5f7fa",
+    background: "var(--bg-page)",
     fontFamily: "system-ui, sans-serif",
-  },
-  header: {
-    background: "#1a1a2e",
-    color: "#fff",
-    padding: "0.75rem 2rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "1.5rem",
-  },
-  heading: {
-    margin: 0,
-    fontSize: "1.2rem",
-    fontWeight: 700,
-  },
-  nav: {
-    display: "flex",
-    gap: "0.25rem",
-    flex: 1,
-  },
-  navBtn: {
-    background: "transparent",
-    border: "none",
-    color: "rgba(255,255,255,0.65)",
-    padding: "0.4rem 0.875rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    transition: "background 0.15s",
-  },
-  navBtnActive: {
-    background: "rgba(255,255,255,0.12)",
-    color: "#fff",
-  },
-  logoutBtn: {
-    background: "transparent",
-    border: "1px solid rgba(255,255,255,0.3)",
-    color: "#fff",
-    padding: "0.4rem 1rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
   },
   main: {
     maxWidth: "900px",
@@ -397,7 +329,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: "1.5rem",
     fontWeight: 700,
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
   },
   titleActions: {
     display: "flex",
@@ -406,7 +338,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   importBtn: {
     padding: "0.6rem 1.25rem",
-    background: "#fff",
+    background: "var(--bg-card)",
     color: "#4f46e5",
     border: "1px solid #4f46e5",
     borderRadius: "8px",
@@ -442,25 +374,25 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: "1rem",
   },
   status: {
-    color: "#6b7280",
+    color: "var(--text-secondary)",
     textAlign: "center",
     padding: "3rem 0",
   },
   emptyState: {
     textAlign: "center",
     padding: "4rem 2rem",
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
   },
   emptyTitle: {
     fontSize: "1.1rem",
     fontWeight: 600,
-    color: "#374151",
+    color: "var(--text-label)",
     margin: "0 0 0.5rem",
   },
   emptySub: {
-    color: "#6b7280",
+    color: "var(--text-secondary)",
     margin: "0 0 1.5rem",
     fontSize: "0.95rem",
   },
@@ -470,11 +402,11 @@ const styles: Record<string, React.CSSProperties> = {
   dateHeading: {
     fontSize: "0.75rem",
     fontWeight: 600,
-    color: "#9ca3af",
+    color: "var(--text-muted)",
     textTransform: "uppercase",
     letterSpacing: "0.05em",
     padding: "0.375rem 0",
-    borderBottom: "1px solid #e5e7eb",
+    borderBottom: "1px solid var(--border)",
     marginBottom: "0.5rem",
   },
   txRow: {
@@ -482,8 +414,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "space-between",
     padding: "0.875rem 1rem",
-    background: "#fff",
-    border: "1px solid #e5e7eb",
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
     marginBottom: "0.375rem",
     gap: "1rem",
@@ -496,7 +428,7 @@ const styles: Record<string, React.CSSProperties> = {
   txDesc: {
     display: "block",
     fontWeight: 500,
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
     fontSize: "0.9375rem",
     whiteSpace: "nowrap",
     overflow: "hidden",
@@ -520,7 +452,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   accountLabel: {
     fontSize: "0.75rem",
-    color: "#9ca3af",
+    color: "var(--text-muted)",
   },
   txRight: {
     display: "flex",
@@ -554,12 +486,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   loadMoreBtn: {
     padding: "0.625rem 2rem",
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--border-input)",
     borderRadius: "8px",
-    background: "#fff",
+    background: "var(--bg-card)",
     cursor: "pointer",
     fontSize: "0.9rem",
-    color: "#374151",
+    color: "var(--text-label)",
     fontWeight: 500,
   },
 };

@@ -1,281 +1,273 @@
 import { useState, useEffect } from "react";
-import { listCategories, type Category } from "../api/categories.js";
-import { useBudgets } from "../hooks/useBudgets.js";
-import { BudgetForm } from "../components/BudgetForm.js";
-import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
-import type { Budget, BudgetPeriod } from "../api/budgets.js";
+import { NavBar } from "../components/NavBar.js";
+import { useExpenses } from "../hooks/useExpenses.js";
+import { listUtilities } from "../api/utilities.js";
+import type { Utility, UtilityType } from "../api/utilities.js";
+import { getExchangeRates } from "../api/expenses.js";
+import type { ExpenseFrequency } from "../api/expenses.js";
+import { getSettings } from "../api/settings.js";
+import { listIncomes, listIncomePersons } from "../api/income.js";
+import type { Income, IncomePerson } from "../api/income.js";
+
+interface OffsetItem {
+  id: string;
+  expenseId: string;
+}
+
+function loadOffsetItems(): OffsetItem[] {
+  try {
+    const raw = localStorage.getItem("expenses-offset-items");
+    return raw ? (JSON.parse(raw) as OffsetItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function calcYearly(amount: string, frequency: ExpenseFrequency): number {
+  const n = parseFloat(amount);
+  if (frequency === "yearly") return n;
+  if (frequency === "monthly") return n * 12;
+  return n * 26;
+}
+
+function convertAmount(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string,
+  rates: Record<string, number>,
+): number {
+  if (fromCurrency === toCurrency) return amount;
+  const fromRate = rates[fromCurrency];
+  const toRate = rates[toCurrency];
+  if (!fromRate || !toRate) return amount;
+  return (amount / fromRate) * toRate;
+}
+
+function fmt(n: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
 
 interface Props {
   onLogout: () => void;
   onNavigate: (page: string) => void;
 }
 
-function fmt(amount: string | number): string {
-  const n = typeof amount === "string" ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
-function ProgressBar({ pct, overBudget }: { pct: number; overBudget: boolean }) {
-  const fill = Math.min(pct, 100);
-  return (
-    <div style={styles.barTrack}>
-      <div
-        style={{
-          ...styles.barFill,
-          width: `${fill}%`,
-          background: overBudget ? "#dc2626" : pct >= 80 ? "#f59e0b" : "#4f46e5",
-        }}
-      />
-    </div>
-  );
-}
-
 export function DashboardPage({ onLogout, onNavigate }: Props) {
-  const { budgets, summary, loading, error, add, edit, remove, refresh } = useBudgets();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [showCreate, setShowCreate] = useState(false);
-  const [editTarget, setEditTarget] = useState<Budget | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Budget | null>(null);
+  const { expenses, loading: expensesLoading } = useExpenses();
+  const [defaultCurrency, setDefaultCurrency] = useState("USD");
+  const [rates, setRates] = useState<Record<string, number> | null>(null);
+  const [ratesDate, setRatesDate] = useState<string | null>(null);
+  const [utilities, setUtilities] = useState<Utility[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
+  const [incomePersons, setIncomePersons] = useState<IncomePerson[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fireExtPct, setFireExtPct] = useState<number>(() => {
+    const saved = localStorage.getItem("dashboard-fire-ext-pct");
+    return saved ? parseInt(saved, 10) : 10;
+  });
+  const [smilePct, setSmilePct] = useState<number>(() => {
+    const saved = localStorage.getItem("dashboard-smile-pct");
+    return saved ? parseInt(saved, 10) : 10;
+  });
+
+  const offsetItems = loadOffsetItems();
 
   useEffect(() => {
-    listCategories()
-      .then(setCategories)
-      .catch((e) => console.error("Failed to load categories:", e));
+    Promise.all([
+      getSettings().then((s) => setDefaultCurrency(s.defaultCurrency)).catch(() => {}),
+      getExchangeRates()
+        .then(({ rates, date }) => {
+          setRates(rates);
+          setRatesDate(date);
+        })
+        .catch(() => {}),
+      listUtilities().then(setUtilities).catch(() => {}),
+      listIncomes().then(setIncomes).catch(() => {}),
+      listIncomePersons().then(setIncomePersons).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
 
-  async function handleCreate(categoryId: string, period: BudgetPeriod, limitAmount: number) {
-    await add(categoryId, period, limitAmount);
-    setShowCreate(false);
-    refresh();
+  function getOffsetYearly(expenseId: string): number {
+    const exp = expenses.find((e) => e.id === expenseId);
+    if (!exp) return 0;
+    const expCurrency = exp.currency ?? defaultCurrency;
+    const yearly = calcYearly(exp.amount, exp.frequency);
+    const converted = rates ? convertAmount(yearly, expCurrency, defaultCurrency, rates) : yearly;
+    return Math.ceil(converted / 100) * 100;
   }
 
-  async function handleEdit(categoryId: string, _period: BudgetPeriod, limitAmount: number) {
-    if (!editTarget) return;
-    await edit(editTarget.id, limitAmount);
-    setEditTarget(null);
-    refresh();
+  const rawTotalWeekly = offsetItems.reduce((sum, o) => sum + getOffsetYearly(o.expenseId) / 52, 0);
+  const offsetWeekly = Math.ceil(rawTotalWeekly / 10) * 10;
+
+  function utilityStats(type: UtilityType) {
+    const rows = utilities.filter((u) => u.type === type);
+    if (rows.length === 0) return null;
+    const avgAmount =
+      rows.reduce((s, u) => {
+        const raw = parseFloat(u.amount);
+        const cur = u.currency ?? defaultCurrency;
+        return s + (rates ? convertAmount(raw, cur, defaultCurrency, rates) : raw);
+      }, 0) / rows.length;
+    const avgDays = rows.reduce((s, u) => s + u.serviceDays, 0) / rows.length;
+    const perDay = avgAmount / avgDays;
+    const perFortnight = perDay * 14;
+    return { perDay, perFortnight };
   }
 
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    await remove(deleteTarget.id);
-    setDeleteTarget(null);
-  }
+  const foreignCurrencies = [
+    ...new Set(
+      expenses.map((e) => e.currency ?? defaultCurrency).filter((c) => c !== defaultCurrency),
+    ),
+  ];
 
-  const totalBudget = budgets.reduce((sum, b) => sum + parseFloat(b.limitAmount), 0);
-  const totalSpend = budgets.reduce((sum, b) => sum + parseFloat(b.currentSpend), 0);
-  const overBudgetCount = budgets.filter(
-    (b) => parseFloat(b.currentSpend) > parseFloat(b.limitAmount),
-  ).length;
+  const avgIncomeByPerson: { id: string; name: string; avg: number; count: number }[] = (() => {
+    const personMap = Object.fromEntries(incomePersons.map((p) => [p.id, p.name]));
+    const totals: Record<string, { sum: number; count: number }> = {};
+    for (const inc of incomes) {
+      if (!inc.personId) continue;
+      const cur = inc.currency ?? defaultCurrency;
+      const amount = parseFloat(inc.amount);
+      const converted = rates ? convertAmount(amount, cur, defaultCurrency, rates) : amount;
+      const entry = totals[inc.personId] ?? { sum: 0, count: 0 };
+      entry.sum += converted;
+      entry.count += 1;
+      totals[inc.personId] = entry;
+    }
+    return Object.entries(totals)
+      .map(([id, { sum, count }]) => ({ id, name: personMap[id] ?? id, avg: sum / count, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  })();
+
+  const totalAvgIncome = avgIncomeByPerson.reduce((sum, p) => sum + p.avg, 0);
+
+  const isLoading = loading || expensesLoading;
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <h1 style={styles.heading}>BudgetApp</h1>
-        <nav style={styles.nav}>
-          <button
-            style={{ ...styles.navBtn, ...styles.navBtnActive }}
-            type="button"
-          >
-            Dashboard
-          </button>
-          <button
-            style={styles.navBtn}
-            type="button"
-            onClick={() => onNavigate("transactions")}
-          >
-            Transactions
-          </button>
-          <button
-            style={styles.navBtn}
-            type="button"
-            onClick={() => onNavigate("accounts")}
-          >
-            Accounts
-          </button>
-          <button
-            style={styles.navBtn}
-            type="button"
-            onClick={() => onNavigate("settings")}
-          >
-            Settings
-          </button>
-        </nav>
-        <button onClick={onLogout} style={styles.logoutBtn} type="button">
-          Sign out
-        </button>
-      </header>
+      <NavBar onLogout={onLogout} onNavigate={onNavigate} activePage="dashboard" />
 
       <main style={styles.main}>
-        {/* Summary cards */}
-        <div style={styles.summaryGrid}>
-          <div style={styles.summaryCard}>
-            <p style={styles.summaryLabel}>Total balance</p>
-            <p style={styles.summaryValue}>
-              {summary ? fmt(summary.totalBalance) : "—"}
-            </p>
-          </div>
-          <div style={styles.summaryCard}>
-            <p style={styles.summaryLabel}>Spent this month</p>
-            <p style={{ ...styles.summaryValue, color: "#dc2626" }}>
-              {summary ? fmt(summary.totalSpentThisMonth) : "—"}
-            </p>
-          </div>
-          <div style={styles.summaryCard}>
-            <p style={styles.summaryLabel}>Budget utilisation</p>
-            <p style={styles.summaryValue}>
-              {budgets.length === 0
-                ? "—"
-                : `${fmt(totalSpend)} / ${fmt(totalBudget)}`}
-            </p>
-          </div>
-          {overBudgetCount > 0 && (
-            <div style={{ ...styles.summaryCard, ...styles.overBudgetCard }}>
-              <p style={styles.summaryLabel}>Over budget</p>
-              <p style={{ ...styles.summaryValue, color: "#dc2626" }}>
-                {overBudgetCount} {overBudgetCount === 1 ? "category" : "categories"}
-              </p>
+        {isLoading && <p style={styles.status}>Loading…</p>}
+
+        {!isLoading && (
+          <>
+            <div style={styles.summaryGrid}>
+              <div style={styles.summaryCard}>
+                <p style={styles.summaryLabel}>Offset Amount</p>
+                <p style={styles.summaryValue}>{fmt(offsetWeekly, defaultCurrency)}</p>
+                <p style={styles.summarySubLabel}>per week</p>
+              </div>
+
+              {(["gas", "power", "water"] as UtilityType[]).map((type) => {
+                const stats = utilityStats(type);
+                if (!stats) return null;
+                const label = type.charAt(0).toUpperCase() + type.slice(1);
+                return (
+                  <div key={type} style={styles.summaryCard}>
+                    <p style={styles.summaryLabel}>{label}</p>
+                    <p style={styles.summaryValue}>{fmt(stats.perFortnight, defaultCurrency)}</p>
+                    <p style={styles.summarySubLabel}>
+                      per fortnight &middot; {fmt(stats.perDay, defaultCurrency)}/day
+                    </p>
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </div>
 
-        {/* Budget list */}
-        <div style={styles.titleRow}>
-          <h2 style={styles.pageTitle}>Budgets</h2>
-          <button onClick={() => setShowCreate(true)} style={styles.addBtn} type="button">
-            + Add budget
-          </button>
-        </div>
+            {avgIncomeByPerson.length > 0 && (
+              <div style={styles.ratesCard}>
+                <div style={styles.ratesCardHeader}>
+                  <span style={styles.ratesCardTitle}>Avg Income Per Person</span>
+                  <span style={styles.ratesCardDate}>average entry amount · {defaultCurrency}</span>
+                </div>
+                <div style={styles.incomePersonList}>
+                  {avgIncomeByPerson.map(({ id, name, avg, count }) => (
+                    <div key={id} style={styles.incomePersonRow}>
+                      <span style={styles.incomePersonName}>{name}</span>
+                      <span style={styles.incomePersonAvg}>{fmt(avg, defaultCurrency)}</span>
+                      <span style={styles.incomePersonCount}>
+                        {count} {count === 1 ? "entry" : "entries"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {loading && <p style={styles.status}>Loading…</p>}
-        {error && <p style={styles.errorMsg}>{error}</p>}
+            {avgIncomeByPerson.length > 0 && (
+              <div style={styles.ratesCard}>
+                <div style={styles.ratesCardHeader}>
+                  <span style={styles.ratesCardTitle}>Allocation</span>
+                  <span style={styles.ratesCardDate}>% of combined avg income</span>
+                </div>
+                <div style={styles.incomePersonList}>
+                  {(
+                    [
+                      { label: "Fire Extinguisher", pct: fireExtPct, key: "dashboard-fire-ext-pct", set: setFireExtPct },
+                      { label: "Smile", pct: smilePct, key: "dashboard-smile-pct", set: setSmilePct },
+                    ] as const
+                  ).map(({ label, pct, key, set }) => (
+                    <div key={label} style={styles.allocationRow}>
+                      <span style={styles.incomePersonName}>{label}</span>
+                      <select
+                        style={styles.pctSelect}
+                        value={pct}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          localStorage.setItem(key, String(v));
+                          set(v);
+                        }}
+                      >
+                        {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80].map((p) => (
+                          <option key={p} value={p}>{p}%</option>
+                        ))}
+                      </select>
+                      <span style={styles.incomePersonAvg}>
+                        {fmt(Math.ceil(((totalAvgIncome * pct) / 100 / 2) / 10) * 10, defaultCurrency)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {!loading && !error && budgets.length === 0 && (
-          <div style={styles.emptyState}>
-            <p style={styles.emptyTitle}>No budgets yet</p>
-            <p style={styles.emptySub}>
-              Create your first budget to start tracking spending by category.
-            </p>
-            <button onClick={() => setShowCreate(true)} style={styles.addBtn} type="button">
-              + Add budget
-            </button>
-          </div>
-        )}
-
-        {budgets.map((budget) => {
-          const spend = parseFloat(budget.currentSpend);
-          const limit = parseFloat(budget.limitAmount);
-          const pct = limit > 0 ? (spend / limit) * 100 : 0;
-          const overBudget = spend > limit;
-          const remaining = limit - spend;
-
-          return (
-            <div
-              key={budget.id}
-              style={{
-                ...styles.budgetCard,
-                borderColor: overBudget ? "#fca5a5" : "#e5e7eb",
-                background: overBudget ? "#fff8f8" : "#fff",
-              }}
-            >
-              <div style={styles.budgetTop}>
-                <div style={styles.budgetInfo}>
-                  <span
-                    style={{
-                      ...styles.catBadge,
-                      background: budget.categoryColor + "22",
-                      color: budget.categoryColor,
-                      border: `1px solid ${budget.categoryColor}55`,
-                    }}
-                  >
-                    {budget.categoryIcon} {budget.categoryName}
-                  </span>
-                  <span style={styles.periodBadge}>
-                    {budget.period === "monthly" ? "Monthly" : "Weekly"}
-                  </span>
-                  {overBudget && (
-                    <span style={styles.overBudgetBadge}>Over budget</span>
+            {foreignCurrencies.length > 0 && rates && (
+              <div style={styles.ratesCard}>
+                <div style={styles.ratesCardHeader}>
+                  <span style={styles.ratesCardTitle}>Exchange Rates</span>
+                  {ratesDate && (
+                    <span style={styles.ratesCardDate}>
+                      Rates as of {ratesDate} (base: {defaultCurrency})
+                    </span>
                   )}
                 </div>
-                <div style={styles.budgetActions}>
-                  <button
-                    onClick={() => setEditTarget(budget)}
-                    style={styles.actionBtn}
-                    type="button"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(budget)}
-                    style={{ ...styles.actionBtn, color: "#dc2626" }}
-                    type="button"
-                  >
-                    Delete
-                  </button>
+                <div style={styles.ratesGrid}>
+                  {foreignCurrencies.map((c) => {
+                    const fromRate = rates[c];
+                    const toRate = rates[defaultCurrency];
+                    if (!fromRate || !toRate) return null;
+                    const rate = toRate / fromRate;
+                    return (
+                      <div key={c} style={styles.rateItem}>
+                        <span style={styles.rateCurrency}>{c}</span>
+                        <span style={styles.rateArrow}>→</span>
+                        <span style={styles.rateValue}>
+                          {rate.toFixed(4)} {defaultCurrency}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-
-              <ProgressBar pct={pct} overBudget={overBudget} />
-
-              <div style={styles.budgetAmounts}>
-                <span style={styles.spendLabel}>
-                  <span style={{ color: overBudget ? "#dc2626" : "#374151", fontWeight: 600 }}>
-                    {fmt(spend)}
-                  </span>
-                  {" spent of "}
-                  <span style={{ fontWeight: 600 }}>{fmt(limit)}</span>
-                </span>
-                <span
-                  style={{
-                    ...styles.remainingLabel,
-                    color: overBudget ? "#dc2626" : "#16a34a",
-                  }}
-                >
-                  {overBudget
-                    ? `${fmt(Math.abs(remaining))} over`
-                    : `${fmt(remaining)} left`}
-                </span>
-              </div>
-
-              <div style={styles.pctRow}>
-                <span style={{ color: overBudget ? "#dc2626" : "#6b7280", fontSize: "0.8rem" }}>
-                  {Math.round(pct)}% used
-                </span>
-              </div>
-            </div>
-          );
-        })}
+            )}
+          </>
+        )}
       </main>
-
-      {showCreate && (
-        <BudgetForm
-          categories={categories}
-          onSubmit={handleCreate}
-          onCancel={() => setShowCreate(false)}
-        />
-      )}
-
-      {editTarget && (
-        <BudgetForm
-          budget={editTarget}
-          categories={categories}
-          onSubmit={handleEdit}
-          onCancel={() => setEditTarget(null)}
-        />
-      )}
-
-      {deleteTarget && (
-        <DeleteConfirmDialog
-          name={`${deleteTarget.categoryIcon} ${deleteTarget.categoryName} (${deleteTarget.period})`}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
     </div>
   );
 }
@@ -283,49 +275,8 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f5f7fa",
+    background: "var(--bg-page)",
     fontFamily: "system-ui, sans-serif",
-  },
-  header: {
-    background: "#1a1a2e",
-    color: "#fff",
-    padding: "0.75rem 2rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "1.5rem",
-  },
-  heading: {
-    margin: 0,
-    fontSize: "1.2rem",
-    fontWeight: 700,
-  },
-  nav: {
-    display: "flex",
-    gap: "0.25rem",
-    flex: 1,
-  },
-  navBtn: {
-    background: "transparent",
-    border: "none",
-    color: "rgba(255,255,255,0.65)",
-    padding: "0.4rem 0.875rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
-    fontWeight: 500,
-  },
-  navBtnActive: {
-    background: "rgba(255,255,255,0.12)",
-    color: "#fff",
-  },
-  logoutBtn: {
-    background: "transparent",
-    border: "1px solid rgba(255,255,255,0.3)",
-    color: "#fff",
-    padding: "0.4rem 1rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
   },
   main: {
     maxWidth: "900px",
@@ -336,174 +287,136 @@ const styles: Record<string, React.CSSProperties> = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
     gap: "1rem",
-    marginBottom: "2rem",
+    marginBottom: "1.5rem",
   },
   summaryCard: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     padding: "1.25rem",
     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-    border: "1px solid #e5e7eb",
-  },
-  overBudgetCard: {
-    borderColor: "#fca5a5",
-    background: "#fff8f8",
+    border: "1px solid var(--border)",
   },
   summaryLabel: {
     margin: "0 0 0.375rem",
     fontSize: "0.8rem",
     fontWeight: 500,
-    color: "#6b7280",
+    color: "var(--text-secondary)",
     textTransform: "uppercase",
     letterSpacing: "0.04em",
   },
   summaryValue: {
-    margin: 0,
+    margin: "0 0 0.2rem",
     fontSize: "1.5rem",
     fontWeight: 700,
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
   },
-  titleRow: {
+  summarySubLabel: {
+    margin: 0,
+    fontSize: "0.75rem",
+    color: "var(--text-secondary)",
+  },
+  ratesCard: {
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: "12px",
+    padding: "1rem 1.25rem",
+    marginBottom: "1.5rem",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+  },
+  ratesCardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "0.75rem",
+  },
+  ratesCardTitle: {
+    fontSize: "0.85rem",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: "var(--text-secondary)",
+  },
+  ratesCardDate: {
+    fontSize: "0.75rem",
+    color: "var(--text-secondary)",
+  },
+  ratesGrid: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "0.75rem",
+  },
+  rateItem: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "1.25rem",
-  },
-  pageTitle: {
-    margin: 0,
-    fontSize: "1.5rem",
-    fontWeight: 700,
-    color: "#1a1a2e",
-  },
-  addBtn: {
-    padding: "0.6rem 1.25rem",
-    background: "#4f46e5",
-    color: "#fff",
-    border: "none",
+    gap: "0.4rem",
+    background: "var(--bg-page)",
+    border: "1px solid var(--border)",
     borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: 600,
-    fontSize: "0.9rem",
+    padding: "0.4rem 0.875rem",
+    fontSize: "0.875rem",
+  },
+  rateCurrency: {
+    fontWeight: 700,
+    color: "var(--text-primary)",
+  },
+  rateArrow: {
+    color: "var(--text-secondary)",
+  },
+  rateValue: {
+    color: "var(--text-primary)",
   },
   status: {
-    color: "#6b7280",
+    color: "var(--text-secondary)",
     textAlign: "center",
     padding: "3rem 0",
   },
-  errorMsg: {
-    color: "#dc2626",
-    background: "#fef2f2",
-    padding: "0.75rem 1rem",
+  incomePersonList: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "0.5rem",
+  },
+  incomePersonRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.75rem",
+    padding: "0.5rem 0.75rem",
+    background: "var(--bg-page)",
+    border: "1px solid var(--border)",
     borderRadius: "8px",
-    fontSize: "0.9rem",
-    marginBottom: "1rem",
+    fontSize: "0.875rem",
   },
-  emptyState: {
-    textAlign: "center",
-    padding: "4rem 2rem",
-    background: "#fff",
-    borderRadius: "12px",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-  },
-  emptyTitle: {
-    fontSize: "1.1rem",
+  incomePersonName: {
+    flex: 1,
     fontWeight: 600,
-    color: "#374151",
-    margin: "0 0 0.5rem",
+    color: "var(--text-primary)",
   },
-  emptySub: {
-    color: "#6b7280",
-    margin: "0 0 1.5rem",
-    fontSize: "0.95rem",
+  incomePersonAvg: {
+    fontWeight: 700,
+    color: "var(--text-primary)",
   },
-  budgetCard: {
-    background: "#fff",
-    borderRadius: "12px",
-    padding: "1.25rem",
-    boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-    border: "1px solid #e5e7eb",
-    marginBottom: "0.875rem",
-  },
-  budgetTop: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: "0.875rem",
-  },
-  budgetInfo: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.5rem",
-    alignItems: "center",
-  },
-  catBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "0.2rem",
-    fontSize: "0.8rem",
-    fontWeight: 600,
-    padding: "0.2rem 0.6rem",
-    borderRadius: "999px",
-  },
-  periodBadge: {
+  incomePersonCount: {
     fontSize: "0.75rem",
-    color: "#6b7280",
-    background: "#f3f4f6",
-    padding: "0.2rem 0.5rem",
-    borderRadius: "999px",
-    fontWeight: 500,
+    color: "var(--text-secondary)",
+    minWidth: "56px",
+    textAlign: "right" as const,
   },
-  overBudgetBadge: {
-    fontSize: "0.75rem",
-    color: "#dc2626",
-    background: "#fef2f2",
-    border: "1px solid #fca5a5",
-    padding: "0.2rem 0.5rem",
-    borderRadius: "999px",
-    fontWeight: 600,
-  },
-  budgetActions: {
+  allocationRow: {
     display: "flex",
-    gap: "0.5rem",
-    flexShrink: 0,
+    alignItems: "center",
+    gap: "0.75rem",
+    padding: "0.5rem 0.75rem",
+    background: "var(--bg-page)",
+    border: "1px solid var(--border)",
+    borderRadius: "8px",
+    fontSize: "0.875rem",
   },
-  actionBtn: {
-    background: "none",
-    border: "none",
+  pctSelect: {
+    padding: "0.3rem 0.5rem",
+    borderRadius: "6px",
+    border: "1px solid var(--border)",
+    fontSize: "0.85rem",
+    background: "var(--bg-page)",
+    color: "var(--text-primary)",
     cursor: "pointer",
-    fontSize: "0.8rem",
-    color: "#4f46e5",
-    padding: "0.2rem 0.4rem",
-    borderRadius: "4px",
-  },
-  barTrack: {
-    height: "8px",
-    background: "#f3f4f6",
-    borderRadius: "999px",
-    overflow: "hidden",
-    marginBottom: "0.625rem",
-  },
-  barFill: {
-    height: "100%",
-    borderRadius: "999px",
-    transition: "width 0.3s ease",
-  },
-  budgetAmounts: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    fontSize: "0.875rem",
-    color: "#374151",
-  },
-  spendLabel: {
-    color: "#374151",
-    fontSize: "0.875rem",
-  },
-  remainingLabel: {
-    fontWeight: 600,
-    fontSize: "0.875rem",
-  },
-  pctRow: {
-    marginTop: "0.25rem",
   },
 };

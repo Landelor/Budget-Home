@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { db, accounts } from "@budgetapp/db";
+import { db, accounts, transactions } from "@budgetapp/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { authenticate } from "../middleware/authenticate.js";
 
@@ -129,10 +129,17 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({ error: "forbidden", message: "Access denied" });
       }
 
-      await db
-        .update(accounts)
-        .set({ deletedAt: new Date() })
-        .where(eq(accounts.id, id));
+      const now = new Date();
+      await db.transaction(async (tx) => {
+        await tx
+          .update(transactions)
+          .set({ deletedAt: now })
+          .where(and(eq(transactions.accountId, id), isNull(transactions.deletedAt)));
+        await tx
+          .update(accounts)
+          .set({ deletedAt: now })
+          .where(eq(accounts.id, id));
+      });
 
       return reply.status(204).send();
     },

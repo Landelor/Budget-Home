@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAccounts } from "../hooks/useAccounts.js";
+import { NavBar } from "../components/NavBar.js";
 import { AccountForm } from "../components/AccountForm.js";
 import { DeleteConfirmDialog } from "../components/DeleteConfirmDialog.js";
 import type { Account, AccountType } from "../api/accounts.js";
@@ -21,7 +22,7 @@ const TYPE_COLORS: Record<AccountType, string> = {
 
 interface Props {
   onLogout: () => void;
-  onNavigate?: (page: string) => void;
+  onNavigate: (page: string) => void;
 }
 
 export function AccountsPage({ onLogout, onNavigate }: Props) {
@@ -56,43 +57,7 @@ export function AccountsPage({ onLogout, onNavigate }: Props) {
 
   return (
     <div style={styles.page}>
-      <header style={styles.header}>
-        <h1 style={styles.heading}>BudgetApp</h1>
-        {onNavigate && (
-          <nav style={{ display: "flex", gap: "0.25rem", flex: 1 }}>
-            <button
-              style={styles.navBtn}
-              type="button"
-              onClick={() => onNavigate("dashboard")}
-            >
-              Dashboard
-            </button>
-            <button
-              style={styles.navBtn}
-              type="button"
-              onClick={() => onNavigate("transactions")}
-            >
-              Transactions
-            </button>
-            <button
-              style={{ ...styles.navBtn, background: "rgba(255,255,255,0.12)", color: "#fff" }}
-              type="button"
-            >
-              Accounts
-            </button>
-            <button
-              style={styles.navBtn}
-              type="button"
-              onClick={() => onNavigate("settings")}
-            >
-              Settings
-            </button>
-          </nav>
-        )}
-        <button onClick={onLogout} style={styles.logoutBtn} type="button">
-          Sign out
-        </button>
-      </header>
+      <NavBar onLogout={onLogout} onNavigate={onNavigate} activePage="accounts" />
 
       <main style={styles.main}>
         <div style={styles.titleRow}>
@@ -193,40 +158,8 @@ export function AccountsPage({ onLogout, onNavigate }: Props) {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f5f7fa",
+    background: "var(--bg-page)",
     fontFamily: "system-ui, sans-serif",
-  },
-  header: {
-    background: "#1a1a2e",
-    color: "#fff",
-    padding: "0.75rem 2rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "1.5rem",
-  },
-  heading: {
-    margin: 0,
-    fontSize: "1.25rem",
-    fontWeight: 700,
-  },
-  navBtn: {
-    background: "transparent",
-    border: "none",
-    color: "rgba(255,255,255,0.65)",
-    padding: "0.4rem 0.875rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
-    fontWeight: 500,
-  },
-  logoutBtn: {
-    background: "transparent",
-    border: "1px solid rgba(255,255,255,0.3)",
-    color: "#fff",
-    padding: "0.4rem 1rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
   },
   main: {
     maxWidth: "900px",
@@ -243,7 +176,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     fontSize: "1.5rem",
     fontWeight: 700,
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
   },
   addBtn: {
     padding: "0.6rem 1.25rem",
@@ -256,7 +189,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.9rem",
   },
   status: {
-    color: "#666",
+    color: "var(--text-secondary)",
     textAlign: "center",
     padding: "3rem 0",
   },
@@ -270,18 +203,18 @@ const styles: Record<string, React.CSSProperties> = {
   emptyState: {
     textAlign: "center",
     padding: "4rem 2rem",
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
   },
   emptyTitle: {
     fontSize: "1.1rem",
     fontWeight: 600,
-    color: "#374151",
+    color: "var(--text-label)",
     margin: "0 0 0.5rem",
   },
   emptySub: {
-    color: "#6b7280",
+    color: "var(--text-secondary)",
     margin: "0 0 1.5rem",
     fontSize: "0.95rem",
   },
@@ -291,11 +224,11 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "1rem",
   },
   card: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     padding: "1.25rem",
     boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-    border: "1px solid #e5e7eb",
+    border: "1px solid var(--border)",
   },
   cardTop: {
     display: "flex",
@@ -327,12 +260,12 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 0 0.5rem",
     fontWeight: 600,
     fontSize: "1rem",
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
   },
   balance: {
     margin: 0,
     fontSize: "1.25rem",
     fontWeight: 700,
-    color: "#374151",
+    color: "var(--text-label)",
   },
 };

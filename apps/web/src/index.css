@@ -1,0 +1,30 @@
+:root {
+  --bg-page: #f5f7fa;
+  --bg-card: #ffffff;
+  --bg-subtle: #f3f4f6;
+  --text-primary: #1a1a2e;
+  --text-secondary: #6b7280;
+  --text-label: #374151;
+  --text-muted: #9ca3af;
+  --border: #e5e7eb;
+  --border-input: #d1d5db;
+}
+
+html.dark {
+  --bg-page: #0f172a;
+  --bg-card: #1e293b;
+  --bg-subtle: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-label: #cbd5e1;
+  --text-muted: #64748b;
+  --border: #334155;
+  --border-input: #475569;
+}
+
+/* Ensure inputs/selects respect theme in dark mode */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  color-scheme: dark;
+}

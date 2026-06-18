@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  integer,
   numeric,
   pgEnum,
   pgTable,
@@ -20,11 +21,21 @@ export const accountTypeEnum = pgEnum("account_type", [
 
 export const budgetPeriodEnum = pgEnum("budget_period", ["monthly", "weekly"]);
 
+export const expenseFrequencyEnum = pgEnum("expense_frequency", [
+  "fortnightly",
+  "monthly",
+  "yearly",
+]);
+
+export const utilityTypeEnum = pgEnum("utility_type", ["gas", "power", "water"]);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   defaultCurrency: varchar("default_currency", { length: 3 }).notNull().default("USD"),
+  darkMode: boolean("dark_mode").notNull().default(false),
+  dateFormat: varchar("date_format", { length: 3 }).notNull().default("MDY"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -89,6 +100,88 @@ export const budgets = pgTable("budgets", {
   deletedAt: timestamp("deleted_at"),
 });
 
+export const expenses = pgTable("expenses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  frequency: expenseFrequencyEnum("frequency").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export const incomePersons = pgTable("income_persons", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export const incomes = pgTable("incomes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  personId: uuid("person_id").references(() => incomePersons.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  date: date("date").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  frequency: expenseFrequencyEnum("frequency").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export const incomeAttachments = pgTable("income_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  incomeId: uuid("income_id")
+    .notNull()
+    .references(() => incomes.id, { onDelete: "cascade" }),
+  originalName: varchar("original_name", { length: 255 }).notNull(),
+  storageKey: varchar("storage_key", { length: 500 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export const utilities = pgTable("utilities", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: utilityTypeEnum("type").notNull(),
+  date: date("date").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+  serviceDays: integer("service_days").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export const utilityAttachments = pgTable("utility_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  utilityId: uuid("utility_id")
+    .notNull()
+    .references(() => utilities.id, { onDelete: "cascade" }),
+  originalName: varchar("original_name", { length: 255 }).notNull(),
+  storageKey: varchar("storage_key", { length: 500 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
 export const refreshTokens = pgTable("refresh_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -106,6 +199,11 @@ export const usersRelations = relations(users, ({ many }) => ({
   transactions: many(transactions),
   budgets: many(budgets),
   categories: many(categories),
+  expenses: many(expenses),
+  utilities: many(utilities),
+  utilityAttachments: many(utilityAttachments),
+  incomePersons: many(incomePersons),
+  incomes: many(incomes),
   refreshTokens: many(refreshTokens),
 }));
 
@@ -153,6 +251,36 @@ export const budgetsRelations = relations(budgets, ({ one }) => ({
   }),
 }));
 
+export const expensesRelations = relations(expenses, ({ one }) => ({
+  user: one(users, { fields: [expenses.userId], references: [users.id] }),
+}));
+
+export const utilitiesRelations = relations(utilities, ({ one, many }) => ({
+  user: one(users, { fields: [utilities.userId], references: [users.id] }),
+  attachments: many(utilityAttachments),
+}));
+
+export const utilityAttachmentsRelations = relations(utilityAttachments, ({ one }) => ({
+  user: one(users, { fields: [utilityAttachments.userId], references: [users.id] }),
+  utility: one(utilities, { fields: [utilityAttachments.utilityId], references: [utilities.id] }),
+}));
+
+export const incomePersonsRelations = relations(incomePersons, ({ one, many }) => ({
+  user: one(users, { fields: [incomePersons.userId], references: [users.id] }),
+  incomes: many(incomes),
+}));
+
+export const incomesRelations = relations(incomes, ({ one, many }) => ({
+  user: one(users, { fields: [incomes.userId], references: [users.id] }),
+  person: one(incomePersons, { fields: [incomes.personId], references: [incomePersons.id] }),
+  attachments: many(incomeAttachments),
+}));
+
+export const incomeAttachmentsRelations = relations(incomeAttachments, ({ one }) => ({
+  user: one(users, { fields: [incomeAttachments.userId], references: [users.id] }),
+  income: one(incomes, { fields: [incomeAttachments.incomeId], references: [incomes.id] }),
+}));
+
 // Inferred TypeScript types
 
 export type User = typeof users.$inferSelect;
@@ -169,6 +297,24 @@ export type NewTransaction = typeof transactions.$inferInsert;
 
 export type Budget = typeof budgets.$inferSelect;
 export type NewBudget = typeof budgets.$inferInsert;
+
+export type Expense = typeof expenses.$inferSelect;
+export type NewExpense = typeof expenses.$inferInsert;
+
+export type Utility = typeof utilities.$inferSelect;
+export type NewUtility = typeof utilities.$inferInsert;
+
+export type UtilityAttachment = typeof utilityAttachments.$inferSelect;
+export type NewUtilityAttachment = typeof utilityAttachments.$inferInsert;
+
+export type IncomePerson = typeof incomePersons.$inferSelect;
+export type NewIncomePerson = typeof incomePersons.$inferInsert;
+
+export type Income = typeof incomes.$inferSelect;
+export type NewIncome = typeof incomes.$inferInsert;
+
+export type IncomeAttachment = typeof incomeAttachments.$inferSelect;
+export type NewIncomeAttachment = typeof incomeAttachments.$inferInsert;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;

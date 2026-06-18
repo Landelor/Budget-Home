@@ -78,7 +78,7 @@ export function TransactionForm({
       <div style={styles.overlay} onClick={onCancel}>
         <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
           <h2 style={styles.title}>Add Transaction</h2>
-          <p style={{ color: "#6b7280", margin: "0 0 1.5rem" }}>
+          <p style={{ color: "var(--text-secondary)", margin: "0 0 1.5rem" }}>
             You need at least one account before adding transactions.
             <br />
             Go to <strong>Accounts</strong> to add one.
@@ -204,7 +204,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "1rem",
   },
   modal: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     padding: "1.75rem",
     width: "100%",
@@ -217,7 +217,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 0 1.25rem",
     fontSize: "1.2rem",
     fontWeight: 600,
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
   },
   form: {
     display: "flex",
@@ -230,17 +230,19 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "0.35rem",
     fontSize: "0.875rem",
     fontWeight: 500,
-    color: "#374151",
+    color: "var(--text-label)",
   },
   input: {
     padding: "0.625rem 0.75rem",
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--border-input)",
     borderRadius: "6px",
     fontSize: "1rem",
+    background: "var(--bg-card)",
+    color: "var(--text-primary)",
   },
   hint: {
     fontSize: "0.75rem",
-    color: "#9ca3af",
+    color: "var(--text-muted)",
   },
   error: {
     color: "#dc2626",
@@ -258,11 +260,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cancelBtn: {
     padding: "0.625rem 1.25rem",
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--border-input)",
     borderRadius: "8px",
     background: "transparent",
     cursor: "pointer",
     fontSize: "0.9rem",
+    color: "var(--text-label)",
   },
   submitBtn: {
     padding: "0.625rem 1.25rem",

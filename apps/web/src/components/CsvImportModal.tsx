@@ -6,19 +6,28 @@ interface Props {
   accounts: Account[];
   onDone: (imported: number) => void;
   onCancel: () => void;
+  dateFormat?: "MDY" | "DMY";
 }
 
 // Normalise a date string to YYYY-MM-DD.
-// Accepts: YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY (falls back to JS Date parse).
-function normaliseDate(raw: string): string | null {
+// Accepts: YYYY-MM-DD, MM/DD/YYYY or DD/MM/YYYY depending on dateFormat preference.
+function normaliseDate(raw: string, dateFormat: "MDY" | "DMY" = "MDY"): string | null {
   const iso = raw.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
-  const mdy = iso.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (mdy) {
-    const m = mdy[1]!;
-    const d = mdy[2]!;
-    const y = mdy[3]!;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  const slashDate = iso.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDate) {
+    let first = parseInt(slashDate[1]!, 10);
+    let second = parseInt(slashDate[2]!, 10);
+    const y = slashDate[3]!;
+    // If first > 12 it must be a day — swap regardless of format preference.
+    // Otherwise honour the user's date format setting.
+    if (first > 12 || dateFormat === "DMY") {
+      [first, second] = [second, first];
+    }
+    const month = first;
+    const day = second;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
   const parsed = new Date(iso);
   if (!isNaN(parsed.getTime())) {
@@ -36,9 +45,19 @@ function parseAmount(credit: string, debit: string): number | null {
   }
   if (d !== "") {
     const n = parseFloat(d);
-    return isNaN(n) ? null : -n;
+    if (isNaN(n)) return null;
+    // Some banks export debit amounts as negative values in the debit column.
+    // Normalise: debits must always reduce the balance (negative).
+    return n > 0 ? -n : n;
   }
   return null;
+}
+
+function parseSingleAmount(raw: string): number | null {
+  const cleaned = raw.replace(/[$,\s]/g, "").trim();
+  if (cleaned === "") return null;
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
 }
 
 // Minimal RFC 4180-aware CSV line splitter.
@@ -70,7 +89,7 @@ function splitCsvLine(line: string): string[] {
   return fields;
 }
 
-function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[] } {
+function parseCsv(text: string, dateFormat: "MDY" | "DMY" = "MDY"): { rows: ImportTransactionRow[]; errors: string[] } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
   if (lines.length < 2) return { rows: [], errors: ["File appears empty or has no data rows."] };
 
@@ -79,12 +98,16 @@ function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[
   const descIdx = header.indexOf("description");
   const creditIdx = header.indexOf("credit");
   const debitIdx = header.indexOf("debit");
+  const amountIdx = header.indexOf("amount");
 
-  if (dateIdx === -1 || descIdx === -1 || (creditIdx === -1 && debitIdx === -1)) {
+  const hasSeparateColumns = creditIdx !== -1 || debitIdx !== -1;
+  const hasSingleAmount = amountIdx !== -1;
+
+  if (dateIdx === -1 || descIdx === -1 || (!hasSeparateColumns && !hasSingleAmount)) {
     return {
       rows: [],
       errors: [
-        "CSV must have Date, Description, and at least one of Credit or Debit columns.",
+        "CSV must have Date, Description, and either an Amount column or Credit/Debit columns.",
       ],
     };
   }
@@ -96,10 +119,8 @@ function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[
     const cols = splitCsvLine(lines[i]!);
     const rawDate = cols[dateIdx]?.trim() ?? "";
     const rawDesc = cols[descIdx]?.trim() ?? "";
-    const rawCredit = creditIdx !== -1 ? (cols[creditIdx]?.trim() ?? "") : "";
-    const rawDebit = debitIdx !== -1 ? (cols[debitIdx]?.trim() ?? "") : "";
 
-    const date = normaliseDate(rawDate);
+    const date = normaliseDate(rawDate, dateFormat);
     if (!date) {
       errors.push(`Row ${i + 1}: invalid date "${rawDate}"`);
       continue;
@@ -108,7 +129,16 @@ function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[
       errors.push(`Row ${i + 1}: missing description`);
       continue;
     }
-    const amount = parseAmount(rawCredit, rawDebit);
+
+    let amount: number | null;
+    if (hasSeparateColumns) {
+      const rawCredit = creditIdx !== -1 ? (cols[creditIdx]?.trim() ?? "") : "";
+      const rawDebit = debitIdx !== -1 ? (cols[debitIdx]?.trim() ?? "") : "";
+      amount = parseAmount(rawCredit, rawDebit);
+    } else {
+      amount = parseSingleAmount(cols[amountIdx]?.trim() ?? "");
+    }
+
     if (amount === null) {
       errors.push(`Row ${i + 1}: no valid credit or debit amount`);
       continue;
@@ -119,7 +149,7 @@ function parseCsv(text: string): { rows: ImportTransactionRow[]; errors: string[
   return { rows, errors };
 }
 
-export function CsvImportModal({ accounts, onDone, onCancel }: Props) {
+export function CsvImportModal({ accounts, onDone, onCancel, dateFormat = "MDY" }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
   const [rows, setRows] = useState<ImportTransactionRow[] | null>(null);
@@ -133,7 +163,7 @@ export function CsvImportModal({ accounts, onDone, onCancel }: Props) {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const { rows: parsed, errors } = parseCsv(text);
+      const { rows: parsed, errors } = parseCsv(text, dateFormat);
       setRows(parsed);
       setParseErrors(errors);
       setSubmitError(null);
@@ -163,7 +193,10 @@ export function CsvImportModal({ accounts, onDone, onCancel }: Props) {
         <h2 style={styles.title}>Import transactions from CSV</h2>
 
         <p style={styles.hint}>
-          Expected columns: <strong>Date, Description, Credit, Debit</strong> (Balance is ignored).
+          Expected columns: <strong>Date, Description, Amount</strong> (negative = debit) or{" "}
+          <strong>Credit, Debit</strong> (Balance is ignored). Dates parsed as{" "}
+          <strong>{dateFormat === "DMY" ? "DD/MM/YYYY" : "MM/DD/YYYY"}</strong>
+          {" "}— change in Settings.
         </p>
 
         <label style={styles.label}>Account</label>
@@ -244,7 +277,7 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 1000,
   },
   modal: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     padding: "2rem",
     width: "100%",
@@ -255,33 +288,36 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 0 0.5rem",
     fontSize: "1.2rem",
     fontWeight: 700,
-    color: "#1a1a2e",
+    color: "var(--text-primary)",
   },
   hint: {
     margin: "0 0 1.25rem",
     fontSize: "0.85rem",
-    color: "#6b7280",
+    color: "var(--text-secondary)",
   },
   label: {
     display: "block",
     fontSize: "0.875rem",
     fontWeight: 600,
-    color: "#374151",
+    color: "var(--text-label)",
     marginBottom: "0.35rem",
   },
   select: {
     width: "100%",
     padding: "0.5rem 0.75rem",
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--border-input)",
     borderRadius: "8px",
     fontSize: "0.9rem",
     marginBottom: "1rem",
     boxSizing: "border-box",
+    background: "var(--bg-card)",
+    color: "var(--text-primary)",
   },
   fileInput: {
     display: "block",
     marginBottom: "1rem",
     fontSize: "0.875rem",
+    color: "var(--text-primary)",
   },
   errorBox: {
     background: "#fef2f2",
@@ -311,7 +347,7 @@ const styles: Record<string, React.CSSProperties> = {
   noRows: {
     margin: 0,
     fontSize: "0.9rem",
-    color: "#6b7280",
+    color: "var(--text-secondary)",
   },
   submitError: {
     color: "#dc2626",
@@ -325,12 +361,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cancelBtn: {
     padding: "0.55rem 1.25rem",
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--border-input)",
     borderRadius: "8px",
-    background: "#fff",
+    background: "var(--bg-card)",
     cursor: "pointer",
     fontSize: "0.9rem",
-    color: "#374151",
+    color: "var(--text-label)",
   },
   importBtn: {
     padding: "0.55rem 1.5rem",
