@@ -6,6 +6,12 @@
 
 set -euo pipefail
 
+# Minimal Debian LXC containers often have no locale generated.
+# C.UTF-8 is always available without needing locale-gen.
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+export DEBIAN_FRONTEND=noninteractive
+
 # ---------------------------------------------------------------------------
 # Color / logging (community-scripts conventions)
 # ---------------------------------------------------------------------------
