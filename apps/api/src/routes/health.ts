@@ -1,10 +1,9 @@
-import { readFileSync } from "fs";
-import { join } from "path";
+import { execSync } from "child_process";
 import type { FastifyInstance } from "fastify";
 
-const VERSION = (() => {
+const COMMIT = (() => {
   try {
-    return (JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8")) as { version?: string }).version ?? "unknown";
+    return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
   } catch {
     return "unknown";
   }
@@ -12,6 +11,6 @@ const VERSION = (() => {
 
 export async function healthRoutes(app: FastifyInstance): Promise<void> {
   app.get("/healthz", async (_request, reply) => {
-    return reply.status(200).send({ status: "ok", version: VERSION });
+    return reply.status(200).send({ status: "ok", commit: COMMIT });
   });
 }

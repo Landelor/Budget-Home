@@ -6,7 +6,7 @@ describe("GET /healthz", () => {
     const app = await buildApp();
     const res = await app.inject({ method: "GET", url: "/healthz" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ status: "ok", version: expect.any(String) });
+    expect(res.json()).toMatchObject({ status: "ok", commit: expect.any(String) });
     await app.close();
   });
 });

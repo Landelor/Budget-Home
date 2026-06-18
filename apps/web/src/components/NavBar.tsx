@@ -10,13 +10,13 @@ interface Props {
 export function NavBar({ onLogout, onNavigate, activePage }: Props) {
   const { isDark, toggleTheme } = useTheme();
   const [expDropOpen, setExpDropOpen] = useState(false);
-  const [version, setVersion] = useState<string | null>(null);
+  const [commit, setCommit] = useState<string | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/healthz")
-      .then((r) => r.json() as Promise<{ version?: string }>)
-      .then((d) => { if (d.version) setVersion(d.version); })
+      .then((r) => r.json() as Promise<{ commit?: string }>)
+      .then((d) => { if (d.commit) setCommit(d.commit); })
       .catch(() => {});
   }, []);
 
@@ -42,7 +42,7 @@ export function NavBar({ onLogout, onNavigate, activePage }: Props) {
     <header style={styles.header}>
       <div style={styles.brandWrap}>
         <h1 style={styles.heading}>BudgetApp</h1>
-        {version && <span style={styles.version}>v{version}</span>}
+        {commit && <span style={styles.version}>{commit}</span>}
       </div>
       <nav style={styles.nav}>
         <button style={navBtn("dashboard")} type="button" onClick={() => onNavigate("dashboard")}>
