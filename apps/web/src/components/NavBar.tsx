@@ -10,7 +10,15 @@ interface Props {
 export function NavBar({ onLogout, onNavigate, activePage }: Props) {
   const { isDark, toggleTheme } = useTheme();
   const [expDropOpen, setExpDropOpen] = useState(false);
+  const [version, setVersion] = useState<string | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/healthz")
+      .then((r) => r.json() as Promise<{ version?: string }>)
+      .then((d) => { if (d.version) setVersion(d.version); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -32,7 +40,10 @@ export function NavBar({ onLogout, onNavigate, activePage }: Props) {
 
   return (
     <header style={styles.header}>
-      <h1 style={styles.heading}>BudgetApp</h1>
+      <div style={styles.brandWrap}>
+        <h1 style={styles.heading}>BudgetApp</h1>
+        {version && <span style={styles.version}>v{version}</span>}
+      </div>
       <nav style={styles.nav}>
         <button style={navBtn("dashboard")} type="button" onClick={() => onNavigate("dashboard")}>
           Dashboard
@@ -96,10 +107,20 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: "1.5rem",
   },
+  brandWrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "1px",
+  },
   heading: {
     margin: 0,
     fontSize: "1.2rem",
     fontWeight: 700,
+  },
+  version: {
+    fontSize: "0.65rem",
+    color: "rgba(255,255,255,0.4)",
+    letterSpacing: "0.02em",
   },
   nav: {
     display: "flex",
