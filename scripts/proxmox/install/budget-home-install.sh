@@ -71,11 +71,13 @@ fi
 # ---------------------------------------------------------------------------
 if ! pg_lsclusters 2>/dev/null | grep -q "16"; then
   msg_info "Installing PostgreSQL 16"
+  # Resolve distro codename without lsb_release (not installed in minimal containers)
+  DISTRO_CODENAME=$(. /etc/os-release && echo "${VERSION_CODENAME:-bookworm}")
   install -d /usr/share/postgresql-common/pgdg
   curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
     | gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg >/dev/null 2>&1
   echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] \
-https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+https://apt.postgresql.org/pub/repos/apt ${DISTRO_CODENAME}-pgdg main" \
     > /etc/apt/sources.list.d/pgdg.list
   apt-get update -qq
   apt-get install -y -qq postgresql-16 >/dev/null 2>&1
