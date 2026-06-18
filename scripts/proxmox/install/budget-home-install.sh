@@ -146,6 +146,8 @@ if [ ! -d "${INSTALL_DIR}/.git" ]; then
   git clone --depth 1 "${REPO_URL}" "${INSTALL_DIR}" >/dev/null 2>&1
   msg_ok "Repository cloned to ${INSTALL_DIR}"
 else
+  # Allow root to operate on repo owned by budgetapp (git 2.35.2+ safe.directory check)
+  git config --global --add safe.directory "${INSTALL_DIR}" 2>/dev/null || true
   msg_info "Updating repository"
   git -C "${INSTALL_DIR}" fetch --quiet origin
   git -C "${INSTALL_DIR}" reset --quiet --hard origin/main

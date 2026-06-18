@@ -45,6 +45,10 @@ if [ ! -f "${ENV_FILE}" ]; then
   msg_error ".env not found at ${ENV_FILE}. Installation may be incomplete."
 fi
 
+# Git 2.35.2+ rejects operations on repos owned by a different user.
+# The install script chowns the repo to budgetapp; allow root to operate on it.
+git config --global --add safe.directory "${INSTALL_DIR}" 2>/dev/null || true
+
 # ---------------------------------------------------------------------------
 # Capture current version
 # ---------------------------------------------------------------------------
