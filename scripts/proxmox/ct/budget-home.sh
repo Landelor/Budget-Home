@@ -98,6 +98,24 @@ if [ -z "$HOSTNAME" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Timezone
+# ---------------------------------------------------------------------------
+TIMEZONE="${BUDGET_HOME_TZ:-}"
+if [ -z "$TIMEZONE" ]; then
+  DEFAULT_TZ=$(timedatectl show --property=Timezone --value 2>/dev/null \
+    || cat /etc/timezone 2>/dev/null \
+    || echo "UTC")
+  read -rp "  Timezone [${DEFAULT_TZ}]: " TIMEZONE
+  TIMEZONE="${TIMEZONE:-$DEFAULT_TZ}"
+fi
+# Validate against /usr/share/zoneinfo
+if [ ! -f "/usr/share/zoneinfo/${TIMEZONE}" ]; then
+  printf "  ${RD}Unknown timezone: %s${CL}\n" "${TIMEZONE}"
+  printf "  Check valid zones in /usr/share/zoneinfo/ (e.g. Europe/London, America/New_York)\n"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
 RAM="${BUDGET_HOME_RAM:-1024}"
@@ -164,6 +182,7 @@ cat <<EOF
   ─────────────────────────────────────
   CTID:          ${GN}${CTID}${CL}
   Hostname:      ${GN}${HOSTNAME}${CL}
+  Timezone:      ${GN}${TIMEZONE}${CL}
   vCPU:          ${GN}${CORES}${CL}
   RAM:           ${GN}${RAM} MB${CL}
   Disk:          ${GN}${DISK} GB${CL} → ${GN}${STORAGE}${CL}
@@ -197,6 +216,7 @@ TEMPLATE="${TMPL_STORAGE}:vztmpl/${TMPL_NAME}"
 msg_info "Creating LXC container ${CTID}"
 pct create "${CTID}" "${TEMPLATE}" \
   --hostname  "${HOSTNAME}" \
+  --timezone  "${TIMEZONE}" \
   --memory    "${RAM}" \
   --cores     "${CORES}" \
   --rootfs    "${STORAGE}:${DISK}" \
@@ -224,7 +244,7 @@ msg_ok "Container started"
 # ---------------------------------------------------------------------------
 printf "\n${YW}○${CL} Running Budget-Home install inside container ${CTID}...\n\n"
 pct exec "${CTID}" -- bash -c \
-  "apt-get install -y -qq curl >/dev/null 2>&1 && bash <(curl -fsSL '${INSTALL_SCRIPT_URL}')"
+  "apt-get install -y -qq curl >/dev/null 2>&1 && BUDGET_HOME_TZ='${TIMEZONE}' bash <(curl -fsSL '${INSTALL_SCRIPT_URL}')"
 printf "\n"
 msg_ok "Budget-Home installed"
 

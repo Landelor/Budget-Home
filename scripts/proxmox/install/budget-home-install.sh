@@ -33,6 +33,7 @@ msg_error() { local m="$1"; printf "${BFR}${CROSS} %s\n" "$m"; exit 1; }
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+BUDGET_HOME_TZ="${BUDGET_HOME_TZ:-}"  # set by ct/budget-home.sh; empty = prompt/skip
 REPO_URL="${BUDGET_HOME_REPO:-https://github.com/Landelor/Budget-Home.git}"
 INSTALL_DIR="${BUDGET_HOME_DIR:-/opt/Budget-Home}"
 APP_USER="budgetapp"
@@ -59,6 +60,25 @@ apt-get install -y -qq \
   openssl \
   sudo >/dev/null 2>&1
 msg_ok "System packages updated"
+
+# ---------------------------------------------------------------------------
+# 1b. Timezone
+# ---------------------------------------------------------------------------
+if [ -z "${BUDGET_HOME_TZ}" ] && [ -t 0 ]; then
+  # Interactive standalone run: prompt the user
+  CURRENT_TZ=$(cat /etc/timezone 2>/dev/null || echo "UTC")
+  read -rp "  Timezone [${CURRENT_TZ}]: " INPUT_TZ
+  BUDGET_HOME_TZ="${INPUT_TZ:-${CURRENT_TZ}}"
+fi
+if [ -n "${BUDGET_HOME_TZ}" ]; then
+  if [ ! -f "/usr/share/zoneinfo/${BUDGET_HOME_TZ}" ]; then
+    msg_error "Unknown timezone '${BUDGET_HOME_TZ}'. Check /usr/share/zoneinfo/ for valid names."
+  fi
+  msg_info "Setting timezone to ${BUDGET_HOME_TZ}"
+  ln -sf "/usr/share/zoneinfo/${BUDGET_HOME_TZ}" /etc/localtime
+  echo "${BUDGET_HOME_TZ}" > /etc/timezone
+  msg_ok "Timezone set to ${BUDGET_HOME_TZ}"
+fi
 
 # ---------------------------------------------------------------------------
 # 2. Node.js 20
