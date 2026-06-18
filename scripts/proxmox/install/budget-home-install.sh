@@ -254,7 +254,7 @@ server {
 
     # Proxy /api to Fastify
     location /api/ {
-        proxy_pass         http://127.0.0.1:${API_PORT}/api/;
+        proxy_pass         http://127.0.0.1:${API_PORT}/;
         proxy_http_version 1.1;
         proxy_set_header   Upgrade \$http_upgrade;
         proxy_set_header   Connection keep-alive;
