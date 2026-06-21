@@ -29,6 +29,16 @@ export const expenseFrequencyEnum = pgEnum("expense_frequency", [
 
 export const utilityTypeEnum = pgEnum("utility_type", ["gas", "power", "water"]);
 
+export const netWorthSectionEnum = pgEnum("net_worth_section", ["asset", "liability"]);
+
+export const netWorthTypeEnum = pgEnum("net_worth_type", [
+  "property",
+  "shares",
+  "bank_account",
+  "super",
+  "loan",
+]);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
@@ -182,6 +192,20 @@ export const utilityAttachments = pgTable("utility_attachments", {
   deletedAt: timestamp("deleted_at"),
 });
 
+export const netWorthEntries = pgTable("net_worth_entries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  section: netWorthSectionEnum("section").notNull(),
+  type: netWorthTypeEnum("type").notNull(),
+  description: varchar("description", { length: 255 }).notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  month: date("month").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
 export const refreshTokens = pgTable("refresh_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -204,6 +228,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   utilityAttachments: many(utilityAttachments),
   incomePersons: many(incomePersons),
   incomes: many(incomes),
+  netWorthEntries: many(netWorthEntries),
   refreshTokens: many(refreshTokens),
 }));
 
@@ -281,6 +306,10 @@ export const incomeAttachmentsRelations = relations(incomeAttachments, ({ one })
   income: one(incomes, { fields: [incomeAttachments.incomeId], references: [incomes.id] }),
 }));
 
+export const netWorthEntriesRelations = relations(netWorthEntries, ({ one }) => ({
+  user: one(users, { fields: [netWorthEntries.userId], references: [users.id] }),
+}));
+
 // Inferred TypeScript types
 
 export type User = typeof users.$inferSelect;
@@ -315,6 +344,9 @@ export type NewIncome = typeof incomes.$inferInsert;
 
 export type IncomeAttachment = typeof incomeAttachments.$inferSelect;
 export type NewIncomeAttachment = typeof incomeAttachments.$inferInsert;
+
+export type NetWorthEntry = typeof netWorthEntries.$inferSelect;
+export type NewNetWorthEntry = typeof netWorthEntries.$inferInsert;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;

@@ -15,6 +15,7 @@ import { expenseRoutes } from "./routes/expenses.js";
 import { exchangeRateRoutes } from "./routes/exchangeRates.js";
 import { utilityRoutes } from "./routes/utilities.js";
 import { incomeRoutes } from "./routes/income.js";
+import { netWorthRoutes } from "./routes/netWorth.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -49,6 +50,7 @@ export async function buildApp() {
   await app.register(exchangeRateRoutes);
   await app.register(utilityRoutes);
   await app.register(incomeRoutes);
+  await app.register(netWorthRoutes);
 
   return app;
 }

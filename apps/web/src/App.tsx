@@ -8,8 +8,9 @@ import { ExpensesPage } from "./pages/ExpensesPage.js";
 import { OffsetPage } from "./pages/OffsetPage.js";
 import { UtilitiesPage } from "./pages/UtilitiesPage.js";
 import { IncomePage } from "./pages/IncomePage.js";
+import { NetWorthPage } from "./pages/NetWorthPage.js";
 
-type Page = "dashboard" | "expenses" | "offset" | "utilities" | "income" | "settings";
+type Page = "dashboard" | "expenses" | "offset" | "utilities" | "income" | "networth" | "settings";
 
 export function App() {
   const { isAuthenticated, loading, error, login, register, logout } = useAuth();
@@ -50,6 +51,12 @@ export function App() {
       )}
       {page === "income" && (
         <IncomePage
+          onLogout={logout}
+          onNavigate={(p) => setPage(p as Page)}
+        />
+      )}
+      {page === "networth" && (
+        <NetWorthPage
           onLogout={logout}
           onNavigate={(p) => setPage(p as Page)}
         />
