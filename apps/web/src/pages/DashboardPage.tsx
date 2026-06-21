@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavBar } from "../components/NavBar.js";
+import { LineChart } from "../components/LineChart.js";
 import { useExpenses } from "../hooks/useExpenses.js";
 import { listUtilities } from "../api/utilities.js";
 import type { Utility, UtilityType } from "../api/utilities.js";
@@ -8,6 +9,8 @@ import type { ExpenseFrequency } from "../api/expenses.js";
 import { getSettings } from "../api/settings.js";
 import { listIncomes, listIncomePersons } from "../api/income.js";
 import type { Income, IncomePerson } from "../api/income.js";
+import { getNetWorthSummary } from "../api/netWorth.js";
+import type { NetWorthMonthSummary } from "../api/netWorth.js";
 
 interface OffsetItem {
   id: string;
@@ -52,6 +55,23 @@ function fmt(n: number, currency: string): string {
   }).format(n);
 }
 
+function formatMonthLabel(monthDate: string): string {
+  const [year, month] = monthDate.split("-");
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+function formatMonthShort(monthDate: string): string {
+  const [year, month] = monthDate.split("-");
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+}
+
+function currentMonthApi(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
 interface Props {
   onLogout: () => void;
   onNavigate: (page: string) => void;
@@ -65,6 +85,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
   const [utilities, setUtilities] = useState<Utility[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [incomePersons, setIncomePersons] = useState<IncomePerson[]>([]);
+  const [netWorthSummary, setNetWorthSummary] = useState<NetWorthMonthSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [fireExtPct, setFireExtPct] = useState<number>(() => {
     const saved = localStorage.getItem("dashboard-fire-ext-pct");
@@ -89,6 +110,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
       listUtilities().then(setUtilities).catch(() => {}),
       listIncomes().then(setIncomes).catch(() => {}),
       listIncomePersons().then(setIncomePersons).catch(() => {}),
+      getNetWorthSummary().then(setNetWorthSummary).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -145,6 +167,9 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
 
   const totalAvgIncome = avgIncomeByPerson.reduce((sum, p) => sum + p.avg, 0);
 
+  const currentNetWorth =
+    netWorthSummary.find((s) => s.month === currentMonthApi()) ?? netWorthSummary.at(-1) ?? null;
+
   const isLoading = loading || expensesLoading;
 
   return (
@@ -177,6 +202,38 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
                   </div>
                 );
               })}
+            </div>
+
+            <div style={styles.ratesCard}>
+              <div style={styles.ratesCardHeader}>
+                <span style={styles.ratesCardTitle}>Net Position</span>
+                <button style={styles.viewLinkBtn} type="button" onClick={() => onNavigate("networth")}>
+                  View Net Worth →
+                </button>
+              </div>
+              {currentNetWorth ? (
+                <>
+                  <p style={styles.netWorthMonthLabel}>{formatMonthLabel(currentNetWorth.month)}</p>
+                  <p
+                    style={{
+                      ...styles.netWorthValue,
+                      color: parseFloat(currentNetWorth.netPosition) >= 0 ? "#16a34a" : "#dc2626",
+                    }}
+                  >
+                    {fmt(parseFloat(currentNetWorth.netPosition), defaultCurrency)}
+                  </p>
+                  <LineChart
+                    points={netWorthSummary.map((s) => ({
+                      label: formatMonthShort(s.month),
+                      value: parseFloat(s.netPosition),
+                    }))}
+                  />
+                </>
+              ) : (
+                <p style={styles.netWorthEmptyMsg}>
+                  Track your assets and liabilities to see your net position here.
+                </p>
+              )}
             </div>
 
             {avgIncomeByPerson.length > 0 && (
@@ -338,6 +395,30 @@ const styles: Record<string, React.CSSProperties> = {
   },
   ratesCardDate: {
     fontSize: "0.75rem",
+    color: "var(--text-secondary)",
+  },
+  viewLinkBtn: {
+    background: "transparent",
+    border: "none",
+    color: "#2563eb",
+    cursor: "pointer",
+    fontSize: "0.8rem",
+    fontWeight: 600,
+    padding: 0,
+  },
+  netWorthMonthLabel: {
+    margin: "0 0 0.2rem",
+    fontSize: "0.8rem",
+    color: "var(--text-secondary)",
+  },
+  netWorthValue: {
+    margin: "0 0 1rem",
+    fontSize: "1.75rem",
+    fontWeight: 700,
+  },
+  netWorthEmptyMsg: {
+    margin: 0,
+    fontSize: "0.9rem",
     color: "var(--text-secondary)",
   },
   ratesGrid: {
