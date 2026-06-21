@@ -94,6 +94,19 @@ export function NetWorthPage({ onLogout, onNavigate }: Props) {
 
   const sortedSummary = useMemo(() => [...summary].sort((a, b) => b.month.localeCompare(a.month)), [summary]);
 
+  const monthOptions = useMemo(() => {
+    const months = new Set<string>();
+    for (const e of entries) months.add(apiMonthToInput(e.month));
+    for (const s of summary) months.add(apiMonthToInput(s.month));
+    months.add(selectedMonth);
+    const now = new Date();
+    for (let i = -24; i <= 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      months.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
+    return Array.from(months).sort((a, b) => b.localeCompare(a));
+  }, [entries, summary, selectedMonth]);
+
   function openAdd(section: NetWorthSection) {
     setFormSection(section);
     setEditing(null);
@@ -232,12 +245,15 @@ export function NetWorthPage({ onLogout, onNavigate }: Props) {
           <h2 style={styles.pageTitle}>Net Worth</h2>
           <label style={styles.monthPicker}>
             Month
-            <input
+            <select
               style={styles.monthInput}
-              type="month"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-            />
+            >
+              {monthOptions.map((m) => (
+                <option key={m} value={m}>{formatMonthLabel(monthInputToApi(m))}</option>
+              ))}
+            </select>
           </label>
         </div>
 
