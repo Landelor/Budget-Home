@@ -1,4 +1,4 @@
-import { apiFetch } from "./client.js";
+import { apiFetch, uploadFile, apiFetchBlob } from "./client.js";
 
 export type IncomeFrequency = "fortnightly" | "monthly" | "yearly";
 
@@ -77,20 +77,9 @@ export function listIncomeAttachments(incomeId: string): Promise<IncomeAttachmen
 }
 
 export function uploadIncomeAttachment(incomeId: string, file: File): Promise<IncomeAttachment> {
-  const token = localStorage.getItem("accessToken");
   const formData = new FormData();
   formData.append("file", file);
-  return fetch(`/api/income/${incomeId}/attachments`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  }).then(async (res) => {
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error((data as { message?: string }).message ?? "Upload failed");
-    }
-    return res.json() as Promise<IncomeAttachment>;
-  });
+  return uploadFile<IncomeAttachment>(`/income/${incomeId}/attachments`, formData);
 }
 
 export function deleteIncomeAttachment(attachmentId: string): Promise<void> {
@@ -98,11 +87,6 @@ export function deleteIncomeAttachment(attachmentId: string): Promise<void> {
 }
 
 export async function fetchIncomeAttachmentBlob(attachmentId: string): Promise<string> {
-  const token = localStorage.getItem("accessToken");
-  const res = await fetch(`/api/income/attachments/${attachmentId}/content`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!res.ok) throw new Error("Failed to fetch attachment");
-  const blob = await res.blob();
+  const blob = await apiFetchBlob(`/income/attachments/${attachmentId}/content`);
   return URL.createObjectURL(blob);
 }

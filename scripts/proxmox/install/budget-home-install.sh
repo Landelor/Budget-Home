@@ -254,6 +254,8 @@ server {
     root ${INSTALL_DIR}/apps/web/dist;
     index index.html;
 
+    client_max_body_size 10m;
+
     # Proxy /api to Fastify
     location /api/ {
         proxy_pass         http://127.0.0.1:${API_PORT}/;

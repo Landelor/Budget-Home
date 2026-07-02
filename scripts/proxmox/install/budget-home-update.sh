@@ -113,6 +113,13 @@ msg_info "Restarting budget-home-api"
 systemctl restart budget-home-api
 msg_ok "budget-home-api restarted"
 
+msg_info "Patching nginx — client_max_body_size"
+NGINX_CONF="/etc/nginx/sites-available/budget-home"
+if [ -f "${NGINX_CONF}" ] && ! grep -q "client_max_body_size" "${NGINX_CONF}"; then
+  sed -i 's|# Proxy /api to Fastify|client_max_body_size 10m;\n\n    # Proxy /api to Fastify|' "${NGINX_CONF}"
+fi
+msg_ok "nginx client_max_body_size patched"
+
 msg_info "Reloading nginx"
 nginx -t >/dev/null 2>&1
 systemctl reload nginx
