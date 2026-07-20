@@ -4,6 +4,8 @@ export interface UserSettings {
   defaultCurrency: string;
   darkMode: boolean;
   dateFormat: "MDY" | "DMY";
+  fireExtinguisherPct: number;
+  smilePct: number;
 }
 
 export const SUPPORTED_CURRENCIES = [

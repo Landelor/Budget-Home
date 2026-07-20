@@ -20,6 +20,8 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
           defaultCurrency: users.defaultCurrency,
           darkMode: users.darkMode,
           dateFormat: users.dateFormat,
+          fireExtinguisherPct: users.fireExtinguisherPct,
+          smilePct: users.smilePct,
         })
         .from(users)
         .where(eq(users.id, request.user.id))
@@ -33,11 +35,21 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         defaultCurrency: user.defaultCurrency,
         darkMode: user.darkMode,
         dateFormat: user.dateFormat,
+        fireExtinguisherPct: user.fireExtinguisherPct,
+        smilePct: user.smilePct,
       });
     },
   });
 
-  app.patch<{ Body: { defaultCurrency?: string; darkMode?: boolean; dateFormat?: string } }>("/settings", {
+  app.patch<{
+    Body: {
+      defaultCurrency?: string;
+      darkMode?: boolean;
+      dateFormat?: string;
+      fireExtinguisherPct?: number;
+      smilePct?: number;
+    };
+  }>("/settings", {
     schema: {
       body: {
         type: "object",
@@ -56,16 +68,28 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
             type: "string",
             enum: SUPPORTED_DATE_FORMATS,
           },
+          fireExtinguisherPct: {
+            type: "integer",
+            minimum: 0,
+            maximum: 100,
+          },
+          smilePct: {
+            type: "integer",
+            minimum: 0,
+            maximum: 100,
+          },
         },
       },
     },
     handler: async (request, reply) => {
-      const { defaultCurrency, darkMode, dateFormat } = request.body;
+      const { defaultCurrency, darkMode, dateFormat, fireExtinguisherPct, smilePct } = request.body;
 
       const updates: Record<string, unknown> = {};
       if (defaultCurrency !== undefined) updates.defaultCurrency = defaultCurrency;
       if (darkMode !== undefined) updates.darkMode = darkMode;
       if (dateFormat !== undefined) updates.dateFormat = dateFormat;
+      if (fireExtinguisherPct !== undefined) updates.fireExtinguisherPct = fireExtinguisherPct;
+      if (smilePct !== undefined) updates.smilePct = smilePct;
 
       if (Object.keys(updates).length === 0) {
         return reply.status(400).send({ error: "bad_request", message: "No fields to update" });
@@ -79,6 +103,8 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
           defaultCurrency: users.defaultCurrency,
           darkMode: users.darkMode,
           dateFormat: users.dateFormat,
+          fireExtinguisherPct: users.fireExtinguisherPct,
+          smilePct: users.smilePct,
         });
 
       if (!updated) {
@@ -89,6 +115,8 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         defaultCurrency: updated.defaultCurrency,
         darkMode: updated.darkMode,
         dateFormat: updated.dateFormat,
+        fireExtinguisherPct: updated.fireExtinguisherPct,
+        smilePct: updated.smilePct,
       });
     },
   });

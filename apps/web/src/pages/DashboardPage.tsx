@@ -6,25 +6,13 @@ import { listUtilities } from "../api/utilities.js";
 import type { Utility, UtilityType } from "../api/utilities.js";
 import { getExchangeRates } from "../api/expenses.js";
 import type { ExpenseFrequency } from "../api/expenses.js";
-import { getSettings } from "../api/settings.js";
+import { getSettings, updateSettings } from "../api/settings.js";
 import { listIncomes, listIncomePersons } from "../api/income.js";
 import type { Income, IncomePerson } from "../api/income.js";
 import { getNetWorthSummary } from "../api/netWorth.js";
 import type { NetWorthMonthSummary } from "../api/netWorth.js";
-
-interface OffsetItem {
-  id: string;
-  expenseId: string;
-}
-
-function loadOffsetItems(): OffsetItem[] {
-  try {
-    const raw = localStorage.getItem("expenses-offset-items");
-    return raw ? (JSON.parse(raw) as OffsetItem[]) : [];
-  } catch {
-    return [];
-  }
-}
+import { listOffsetItems } from "../api/offsetItems.js";
+import type { OffsetItem } from "../api/offsetItems.js";
 
 function calcYearly(amount: string, frequency: ExpenseFrequency): number {
   const n = parseFloat(amount);
@@ -87,20 +75,19 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
   const [incomePersons, setIncomePersons] = useState<IncomePerson[]>([]);
   const [netWorthSummary, setNetWorthSummary] = useState<NetWorthMonthSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fireExtPct, setFireExtPct] = useState<number>(() => {
-    const saved = localStorage.getItem("dashboard-fire-ext-pct");
-    return saved ? parseInt(saved, 10) : 10;
-  });
-  const [smilePct, setSmilePct] = useState<number>(() => {
-    const saved = localStorage.getItem("dashboard-smile-pct");
-    return saved ? parseInt(saved, 10) : 10;
-  });
-
-  const offsetItems = loadOffsetItems();
+  const [fireExtPct, setFireExtPct] = useState<number>(10);
+  const [smilePct, setSmilePct] = useState<number>(10);
+  const [offsetItems, setOffsetItems] = useState<OffsetItem[]>([]);
 
   useEffect(() => {
     Promise.all([
-      getSettings().then((s) => setDefaultCurrency(s.defaultCurrency)).catch(() => {}),
+      getSettings()
+        .then((s) => {
+          setDefaultCurrency(s.defaultCurrency);
+          setFireExtPct(s.fireExtinguisherPct);
+          setSmilePct(s.smilePct);
+        })
+        .catch(() => {}),
       getExchangeRates()
         .then(({ rates, date }) => {
           setRates(rates);
@@ -111,6 +98,7 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
       listIncomes().then(setIncomes).catch(() => {}),
       listIncomePersons().then(setIncomePersons).catch(() => {}),
       getNetWorthSummary().then(setNetWorthSummary).catch(() => {}),
+      listOffsetItems().then(setOffsetItems).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -265,10 +253,10 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
                 <div style={styles.incomePersonList}>
                   {(
                     [
-                      { label: "Fire Extinguisher", pct: fireExtPct, key: "dashboard-fire-ext-pct", set: setFireExtPct },
-                      { label: "Smile", pct: smilePct, key: "dashboard-smile-pct", set: setSmilePct },
+                      { label: "Fire Extinguisher", pct: fireExtPct, field: "fireExtinguisherPct", set: setFireExtPct },
+                      { label: "Smile", pct: smilePct, field: "smilePct", set: setSmilePct },
                     ] as const
-                  ).map(({ label, pct, key, set }) => (
+                  ).map(({ label, pct, field, set }) => (
                     <div key={label} style={styles.allocationRow}>
                       <span style={styles.incomePersonName}>{label}</span>
                       <select
@@ -276,8 +264,9 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
                         value={pct}
                         onChange={(e) => {
                           const v = parseInt(e.target.value, 10);
-                          localStorage.setItem(key, String(v));
+                          const previous = pct;
                           set(v);
+                          updateSettings({ [field]: v }).catch(() => set(previous));
                         }}
                       >
                         {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80].map((p) => (

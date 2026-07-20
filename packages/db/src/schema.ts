@@ -46,6 +46,8 @@ export const users = pgTable("users", {
   defaultCurrency: varchar("default_currency", { length: 3 }).notNull().default("USD"),
   darkMode: boolean("dark_mode").notNull().default(false),
   dateFormat: varchar("date_format", { length: 3 }).notNull().default("MDY"),
+  fireExtinguisherPct: integer("fire_extinguisher_pct").notNull().default(10),
+  smilePct: integer("smile_pct").notNull().default(10),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -192,6 +194,18 @@ export const utilityAttachments = pgTable("utility_attachments", {
   deletedAt: timestamp("deleted_at"),
 });
 
+export const offsetItems = pgTable("offset_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expenseId: uuid("expense_id")
+    .notNull()
+    .references(() => expenses.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
 export const netWorthEntries = pgTable("net_worth_entries", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -229,6 +243,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   incomePersons: many(incomePersons),
   incomes: many(incomes),
   netWorthEntries: many(netWorthEntries),
+  offsetItems: many(offsetItems),
   refreshTokens: many(refreshTokens),
 }));
 
@@ -310,6 +325,11 @@ export const netWorthEntriesRelations = relations(netWorthEntries, ({ one }) => 
   user: one(users, { fields: [netWorthEntries.userId], references: [users.id] }),
 }));
 
+export const offsetItemsRelations = relations(offsetItems, ({ one }) => ({
+  user: one(users, { fields: [offsetItems.userId], references: [users.id] }),
+  expense: one(expenses, { fields: [offsetItems.expenseId], references: [expenses.id] }),
+}));
+
 // Inferred TypeScript types
 
 export type User = typeof users.$inferSelect;
@@ -347,6 +367,9 @@ export type NewIncomeAttachment = typeof incomeAttachments.$inferInsert;
 
 export type NetWorthEntry = typeof netWorthEntries.$inferSelect;
 export type NewNetWorthEntry = typeof netWorthEntries.$inferInsert;
+
+export type OffsetItem = typeof offsetItems.$inferSelect;
+export type NewOffsetItem = typeof offsetItems.$inferInsert;
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;

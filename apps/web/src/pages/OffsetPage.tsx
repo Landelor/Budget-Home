@@ -1,27 +1,10 @@
 import { useState, useEffect } from "react";
 import { NavBar } from "../components/NavBar.js";
 import { useExpenses } from "../hooks/useExpenses.js";
+import { useOffsetItems } from "../hooks/useOffsetItems.js";
 import type { ExpenseFrequency } from "../api/expenses.js";
 import { getExchangeRates } from "../api/expenses.js";
 import { getSettings } from "../api/settings.js";
-
-interface OffsetItem {
-  id: string;
-  expenseId: string;
-}
-
-function loadOffsetItems(): OffsetItem[] {
-  try {
-    const raw = localStorage.getItem("expenses-offset-items");
-    return raw ? (JSON.parse(raw) as OffsetItem[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveOffsetItems(items: OffsetItem[]) {
-  localStorage.setItem("expenses-offset-items", JSON.stringify(items));
-}
 
 function calcYearly(amount: string, frequency: ExpenseFrequency): number {
   const n = parseFloat(amount);
@@ -59,9 +42,9 @@ interface Props {
 
 export function OffsetPage({ onLogout, onNavigate }: Props) {
   const { expenses } = useExpenses();
+  const { offsetItems, loading: offsetItemsLoading, add: addOffsetItem, remove: removeOffsetItem } = useOffsetItems();
   const [defaultCurrency, setDefaultCurrency] = useState("USD");
   const [rates, setRates] = useState<Record<string, number> | null>(null);
-  const [offsetItems, setOffsetItems] = useState<OffsetItem[]>(loadOffsetItems);
   const [showSelect, setShowSelect] = useState(false);
   const [selectId, setSelectId] = useState<string>("");
 
@@ -85,19 +68,11 @@ export function OffsetPage({ onLogout, onNavigate }: Props) {
     return Math.ceil(converted / 100) * 100;
   }
 
-  function addItem() {
+  async function addItem() {
     if (!selectId) return;
-    const newItems = [...offsetItems, { id: `${Date.now()}-${Math.random()}`, expenseId: selectId }];
-    setOffsetItems(newItems);
-    saveOffsetItems(newItems);
+    await addOffsetItem(selectId);
     setSelectId("");
     setShowSelect(false);
-  }
-
-  function removeItem(id: string) {
-    const newItems = offsetItems.filter((o) => o.id !== id);
-    setOffsetItems(newItems);
-    saveOffsetItems(newItems);
   }
 
   return (
@@ -145,7 +120,7 @@ export function OffsetPage({ onLogout, onNavigate }: Props) {
               </tr>
             </thead>
             <tbody>
-              {offsetItems.length === 0 && (
+              {!offsetItemsLoading && offsetItems.length === 0 && (
                 <tr>
                   <td colSpan={4} style={{ ...styles.td, textAlign: "center", color: "var(--text-secondary)", fontSize: "0.85rem" }}>
                     No items yet. Click + Add to select an expense.
@@ -166,7 +141,7 @@ export function OffsetPage({ onLogout, onNavigate }: Props) {
                       <button
                         style={{ ...styles.actionBtn, ...styles.deleteBtn }}
                         type="button"
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => removeOffsetItem(item.id)}
                       >
                         Remove
                       </button>
