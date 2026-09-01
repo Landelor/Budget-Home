@@ -78,8 +78,12 @@ export function NetWorthPage({ onLogout, onNavigate }: Props) {
 
   const monthApi = monthInputToApi(selectedMonth);
   const monthEntries = entries.filter((e) => e.month === monthApi);
-  const assetEntries = monthEntries.filter((e) => e.section === "asset");
-  const liabilityEntries = monthEntries.filter((e) => e.section === "liability");
+  const assetEntries = monthEntries
+    .filter((e) => e.section === "asset")
+    .sort((a, b) => a.description.localeCompare(b.description));
+  const liabilityEntries = monthEntries
+    .filter((e) => e.section === "liability")
+    .sort((a, b) => a.description.localeCompare(b.description));
 
   const monthSummary = summary.find((s) => s.month === monthApi);
   const totalAssets = monthSummary ? parseFloat(monthSummary.totalAssets) : 0;
@@ -173,7 +177,7 @@ export function NetWorthPage({ onLogout, onNavigate }: Props) {
     try {
       const toCopy = entries.filter((e) => e.month === previousMonthWithEntries);
       for (const entry of toCopy) {
-        await add(entry.type, entry.description, parseFloat(entry.amount), monthApi);
+        await add(entry.type, entry.description, 0, monthApi);
       }
     } finally {
       setCopying(false);
