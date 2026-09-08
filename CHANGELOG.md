@@ -6,6 +6,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- **Data export** — export all entered data from the Dashboard as either a CSV bundle (one file per section, zipped) or a single JSON file, via a new `GET /export` API endpoint
+
+
 ## [0.1.0] - 2026-06-18
 
 ### Added

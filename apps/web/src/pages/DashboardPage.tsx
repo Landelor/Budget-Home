@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavBar } from "../components/NavBar.js";
 import { LineChart } from "../components/LineChart.js";
+import { ExportMenu } from "../components/ExportMenu.js";
 import { useExpenses } from "../hooks/useExpenses.js";
 import { listUtilities } from "../api/utilities.js";
 import type { Utility, UtilityType } from "../api/utilities.js";
@@ -169,6 +170,8 @@ export function DashboardPage({ onLogout, onNavigate }: Props) {
 
         {!isLoading && (
           <>
+            <ExportMenu />
+
             <div style={styles.summaryGrid}>
               <div style={styles.summaryCard}>
                 <p style={styles.summaryLabel}>Offset Amount</p>

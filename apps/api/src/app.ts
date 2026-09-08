@@ -17,6 +17,7 @@ import { utilityRoutes } from "./routes/utilities.js";
 import { incomeRoutes } from "./routes/income.js";
 import { netWorthRoutes } from "./routes/netWorth.js";
 import { offsetItemRoutes } from "./routes/offsetItems.js";
+import { exportRoutes } from "./routes/export.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -53,6 +54,7 @@ export async function buildApp() {
   await app.register(incomeRoutes);
   await app.register(netWorthRoutes);
   await app.register(offsetItemRoutes);
+  await app.register(exportRoutes);
 
   return app;
 }
