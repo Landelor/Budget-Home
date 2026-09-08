@@ -8,6 +8,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- **Data import** — import a previously-exported JSON file back into the app from the Dashboard's Export/Import control; every row is added as a new record (accounts, expenses, transactions, income, utilities, net worth entries, etc.) — nothing existing is overwritten or deleted, and a preview of row counts is shown before confirming, via a new `POST /import` API endpoint
 - **Data export** — export all entered data from the Dashboard as either a CSV bundle (one file per section, zipped) or a single JSON file, via a new `GET /export` API endpoint
 
 

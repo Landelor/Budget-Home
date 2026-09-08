@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { downloadExport, type ExportFormat } from "../api/exportData.js";
 import { ApiError } from "../api/client.js";
+import { ImportModal } from "./ImportModal.js";
 
-// Small, self-contained "Export Data" control: a single button that opens a
-// two-option dropdown (CSV bundle / JSON) and triggers a file download.
-// Deliberately compact so it doesn't compete with the dashboard's summary
-// cards and charts for visual attention.
+// Small, self-contained "Export data" control: a single button that opens a
+// compact dropdown (CSV bundle / JSON export, plus an import option) and
+// triggers a file download or opens the import modal. Deliberately compact
+// so it doesn't compete with the dashboard's summary cards and charts.
 export function ExportMenu() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,12 +44,13 @@ export function ExportMenu() {
         style={styles.trigger}
         onClick={() => setOpen((o) => !o)}
         disabled={busy}
-        title="Export your data"
+        title="Export or import your data"
       >
-        {busy ? "Exporting…" : "Export data ⬇"}
+        {busy ? "Exporting…" : "Export / Import ⬇"}
       </button>
       {open && (
         <div style={styles.dropdown}>
+          <p style={styles.dropSectionLabel}>Export</p>
           <button type="button" style={styles.dropItem} onClick={() => handleExport("csv")}>
             <span style={styles.dropItemLabel}>CSV bundle</span>
             <span style={styles.dropItemHint}>.zip — one file per section</span>
@@ -56,9 +59,32 @@ export function ExportMenu() {
             <span style={styles.dropItemLabel}>JSON</span>
             <span style={styles.dropItemHint}>.json — full raw data</span>
           </button>
+          <div style={styles.dropDivider} />
+          <p style={styles.dropSectionLabel}>Import</p>
+          <button
+            type="button"
+            style={styles.dropItem}
+            onClick={() => {
+              setOpen(false);
+              setImportOpen(true);
+            }}
+          >
+            <span style={styles.dropItemLabel}>From JSON export</span>
+            <span style={styles.dropItemHint}>merges as new records</span>
+          </button>
         </div>
       )}
       {error && <p style={styles.error}>{error}</p>}
+      {importOpen && (
+        <ImportModal
+          onCancel={() => setImportOpen(false)}
+          onDone={() => {
+            setImportOpen(false);
+            // Reload so every page/hook picks up the newly imported data.
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -88,9 +114,22 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid var(--border)",
     borderRadius: "8px",
     padding: "0.25rem",
-    minWidth: "200px",
+    minWidth: "210px",
     zIndex: 200,
     boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+  },
+  dropSectionLabel: {
+    margin: "0.35rem 0.75rem 0.15rem",
+    fontSize: "0.65rem",
+    fontWeight: 700,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: "var(--text-secondary)",
+  },
+  dropDivider: {
+    height: "1px",
+    background: "var(--border)",
+    margin: "0.25rem 0",
   },
   dropItem: {
     display: "flex",
