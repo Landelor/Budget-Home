@@ -6,6 +6,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- **Offset page** — the "Add" expense dropdown now excludes expenses that have already been added to the offset list, and the button disables once every expense is added
+
+
 ### Added
 
 - **Data import** — import a previously-exported JSON file back into the app from the Dashboard's Export/Import control; every row is added as a new record (accounts, expenses, transactions, income, utilities, net worth entries, etc.) — nothing existing is overwritten or deleted, and a preview of row counts is shown before confirming, via a new `POST /import` API endpoint

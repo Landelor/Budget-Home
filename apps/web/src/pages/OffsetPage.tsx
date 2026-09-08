@@ -58,6 +58,8 @@ export function OffsetPage({ onLogout, onNavigate }: Props) {
   }, []);
 
   const sortedExpenses = [...expenses].sort((a, b) => a.name.localeCompare(b.name));
+  const addedExpenseIds = new Set(offsetItems.map((item) => item.expenseId));
+  const availableExpenses = sortedExpenses.filter((exp) => !addedExpenseIds.has(exp.id));
 
   function getOffsetYearly(expenseId: string): number {
     const exp = expenses.find((e) => e.id === expenseId);
@@ -83,9 +85,11 @@ export function OffsetPage({ onLogout, onNavigate }: Props) {
         <div style={styles.toolbar}>
           <h2 style={styles.pageTitle}>Offset</h2>
           <button
-            style={styles.addBtn}
+            style={{ ...styles.addBtn, opacity: availableExpenses.length === 0 ? 0.5 : 1 }}
             type="button"
-            onClick={() => { setShowSelect(true); setSelectId(sortedExpenses[0]?.id ?? ""); }}
+            disabled={availableExpenses.length === 0}
+            title={availableExpenses.length === 0 ? "All expenses have already been added" : undefined}
+            onClick={() => { setShowSelect(true); setSelectId(availableExpenses[0]?.id ?? ""); }}
           >
             + Add
           </button>
@@ -99,7 +103,7 @@ export function OffsetPage({ onLogout, onNavigate }: Props) {
               value={selectId}
               onChange={(e) => setSelectId(e.target.value)}
             >
-              {sortedExpenses.map((exp) => (
+              {availableExpenses.map((exp) => (
                 <option key={exp.id} value={exp.id}>{exp.name}</option>
               ))}
             </select>
