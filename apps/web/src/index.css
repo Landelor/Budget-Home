@@ -10,6 +10,19 @@
   --border-input: #d1d5db;
 }
 
+/* Prevent any single wide element (e.g. a table that ignores its own
+   overflow:auto wrapper) from stretching the whole page and pushing
+   content off the right edge of small/mobile viewports. Inner elements
+   that need horizontal scrolling (data tables) still scroll themselves. */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 html.dark {
   --bg-page: #0f172a;
   --bg-card: #1e293b;
