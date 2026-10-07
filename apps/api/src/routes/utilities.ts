@@ -236,18 +236,29 @@ export async function utilityRoutes(app: FastifyInstance): Promise<void> {
       data.file.on("data", (chunk: Buffer) => { fileSize += chunk.length; });
       await pipeline(data.file, writeStream);
 
-      const [attachment] = await db
-        .insert(utilityAttachments)
-        .values({
-          userId: request.user.id,
-          utilityId: id,
-          originalName: data.filename,
-          storageKey,
-          fileSize,
-        })
-        .returning();
+      try {
+        const [attachment] = await db
+          .insert(utilityAttachments)
+          .values({
+            userId: request.user.id,
+            utilityId: id,
+            originalName: data.filename,
+            storageKey,
+            fileSize,
+          })
+          .returning();
 
-      return reply.status(201).send(attachment);
+        return reply.status(201).send(attachment);
+      } catch (err) {
+        // A concurrent request may have inserted the active attachment
+        // between our existence check and this insert — the partial unique
+        // index on (utility_id) WHERE deleted_at IS NULL catches that race.
+        if ((err as { code?: string }).code === "23505") {
+          try { unlinkSync(dest); } catch { /* ignore cleanup errors */ }
+          return reply.status(409).send({ error: "already_exists", message: "An attachment already exists for this entry. Delete it first." });
+        }
+        throw err;
+      }
     },
   });
 

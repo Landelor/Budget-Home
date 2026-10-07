@@ -3,7 +3,7 @@ import { db, users, refreshTokens } from "@budgetapp/db";
 import { eq, and, gt } from "drizzle-orm";
 import {
   hashPassword,
-  verifyPassword,
+  verifyPasswordTimingSafe,
   signAccessToken,
   generateRefreshToken,
   hashRefreshToken,
@@ -29,6 +29,7 @@ interface LogoutBody {
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: RegisterBody }>("/auth/register", {
+    config: { rateLimit: { max: 5, timeWindow: "15 minutes" } },
     schema: {
       body: {
         type: "object",
@@ -84,7 +85,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(users.email, email.toLowerCase()))
         .limit(1);
 
-      const valid = user ? await verifyPassword(password, user.passwordHash) : false;
+      // Always run bcrypt.compare, even when no user was found, so the
+      // response time doesn't reveal whether the email is registered.
+      const valid = await verifyPasswordTimingSafe(password, user?.passwordHash);
 
       if (!user || !valid) {
         return reply.status(401).send({ error: "Invalid email or password" });

@@ -6,11 +6,12 @@ import {
   pgEnum,
   pgTable,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 export const accountTypeEnum = pgEnum("account_type", [
   "checking",
@@ -150,20 +151,29 @@ export const incomes = pgTable("incomes", {
   deletedAt: timestamp("deleted_at"),
 });
 
-export const incomeAttachments = pgTable("income_attachments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  incomeId: uuid("income_id")
-    .notNull()
-    .references(() => incomes.id, { onDelete: "cascade" }),
-  originalName: varchar("original_name", { length: 255 }).notNull(),
-  storageKey: varchar("storage_key", { length: 500 }).notNull(),
-  fileSize: integer("file_size").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  deletedAt: timestamp("deleted_at"),
-});
+export const incomeAttachments = pgTable(
+  "income_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    incomeId: uuid("income_id")
+      .notNull()
+      .references(() => incomes.id, { onDelete: "cascade" }),
+    originalName: varchar("original_name", { length: 255 }).notNull(),
+    storageKey: varchar("storage_key", { length: 500 }).notNull(),
+    fileSize: integer("file_size").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (table) => ({
+    // At most one active (non-deleted) attachment per income entry.
+    incomeIdActiveUnique: uniqueIndex("income_attachments_income_id_active_unique")
+      .on(table.incomeId)
+      .where(sql`${table.deletedAt} IS NULL`),
+  }),
+);
 
 export const utilities = pgTable("utilities", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -179,20 +189,29 @@ export const utilities = pgTable("utilities", {
   deletedAt: timestamp("deleted_at"),
 });
 
-export const utilityAttachments = pgTable("utility_attachments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  utilityId: uuid("utility_id")
-    .notNull()
-    .references(() => utilities.id, { onDelete: "cascade" }),
-  originalName: varchar("original_name", { length: 255 }).notNull(),
-  storageKey: varchar("storage_key", { length: 500 }).notNull(),
-  fileSize: integer("file_size").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  deletedAt: timestamp("deleted_at"),
-});
+export const utilityAttachments = pgTable(
+  "utility_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    utilityId: uuid("utility_id")
+      .notNull()
+      .references(() => utilities.id, { onDelete: "cascade" }),
+    originalName: varchar("original_name", { length: 255 }).notNull(),
+    storageKey: varchar("storage_key", { length: 500 }).notNull(),
+    fileSize: integer("file_size").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (table) => ({
+    // At most one active (non-deleted) attachment per utility entry.
+    utilityIdActiveUnique: uniqueIndex("utility_attachments_utility_id_active_unique")
+      .on(table.utilityId)
+      .where(sql`${table.deletedAt} IS NULL`),
+  }),
+);
 
 export const offsetItems = pgTable("offset_items", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -93,6 +93,13 @@ export async function importRoutes(app: FastifyInstance): Promise<void> {
       const body = request.body ?? {};
       const sections: Record<string, SectionSummary> = {};
 
+      // Run the whole import as one DB transaction: a failure partway
+      // through (bad data, connection drop, etc.) rolls everything back
+      // instead of leaving a half-imported, inconsistent dataset. Note this
+      // shadows the outer `db` import for the rest of the handler so every
+      // query below runs inside the transaction.
+      await db.transaction(async (db) => {
+
       function newSection(name: string): SectionSummary {
         const section: SectionSummary = { imported: 0, skipped: 0, errors: [] };
         sections[name] = section;
@@ -445,6 +452,7 @@ export async function importRoutes(app: FastifyInstance): Promise<void> {
         }
         offsetItemSummary.imported++;
       }
+      });
 
       const totalImported = Object.values(sections).reduce((sum, s) => sum + s.imported, 0);
       const totalSkipped = Object.values(sections).reduce((sum, s) => sum + s.skipped, 0);

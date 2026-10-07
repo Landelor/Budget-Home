@@ -23,6 +23,21 @@ export function verifyPassword(
   return bcrypt.compare(password, hash);
 }
 
+// A precomputed bcrypt hash of a random value, with no corresponding
+// account. Used to run a real bcrypt.compare() when the looked-up user
+// doesn't exist, so login takes roughly the same time whether or not the
+// email is registered — otherwise the fast-path (skipping bcrypt entirely)
+// is a timing side-channel that lets an attacker enumerate valid emails.
+const DUMMY_PASSWORD_HASH =
+  "$2b$12$CwTycUXWue0Thq9StjUM0uJ8C9HKF7X3fJj/g9IlYGs93kHZxQpqa";
+
+export function verifyPasswordTimingSafe(
+  password: string,
+  hash: string | undefined,
+): Promise<boolean> {
+  return bcrypt.compare(password, hash ?? DUMMY_PASSWORD_HASH);
+}
+
 export interface AccessTokenPayload {
   sub: string;
   email: string;
