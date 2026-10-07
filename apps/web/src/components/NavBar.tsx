@@ -105,10 +105,12 @@ const styles: Record<string, React.CSSProperties> = {
   header: {
     background: "#1a1a2e",
     color: "#fff",
-    padding: "0.75rem 2rem",
+    padding: "0.75rem clamp(0.75rem, 4vw, 2rem)",
     display: "flex",
+    flexWrap: "wrap" as const,
     alignItems: "center",
-    gap: "1.5rem",
+    gap: "0.75rem",
+    rowGap: "0.5rem",
   },
   brandWrap: {
     display: "flex",
@@ -127,8 +129,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   nav: {
     display: "flex",
+    flexWrap: "wrap" as const,
     gap: "0.25rem",
-    flex: 1,
+    rowGap: "0.35rem",
+    flex: "1 1 auto",
     alignItems: "center",
   },
   navBtn: {
