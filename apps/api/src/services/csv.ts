@@ -6,11 +6,20 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
+// Characters that spreadsheet apps (Excel, Sheets, LibreOffice) treat as the
+// start of a formula. Without neutralising them, a user-controlled string
+// like `=HYPERLINK(...)` or `=cmd|'/c calc'!A1` stored as e.g. a transaction
+// description would execute when the exported CSV is opened (CSV/formula
+// injection). Prefixing with a single quote forces spreadsheet apps to treat
+// the cell as plain text while leaving the value unchanged for CSV parsers.
+const FORMULA_PREFIX_RE = /^[=+\-@\t\r]/;
+
 function escapeCell(raw: string): string {
-  if (/[",\n\r]/.test(raw)) {
-    return `"${raw.replace(/"/g, '""')}"`;
+  const safe = FORMULA_PREFIX_RE.test(raw) ? `'${raw}` : raw;
+  if (/[",\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return raw;
+  return safe;
 }
 
 /**

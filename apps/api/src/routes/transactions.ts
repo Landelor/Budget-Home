@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { db, transactions, accounts } from "@budgetapp/db";
-import { eq, and, isNull, gte, lte, desc, sql } from "drizzle-orm";
+import { db, transactions, accounts, categories } from "@budgetapp/db";
+import { eq, and, or, isNull, gte, lte, desc, sql } from "drizzle-orm";
 import { authenticate } from "../middleware/authenticate.js";
 
 export async function transactionRoutes(app: FastifyInstance): Promise<void> {
@@ -99,6 +99,27 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({ error: "forbidden", message: "Access denied" });
       }
 
+      // Category must belong to this user or be a shared/global category —
+      // otherwise a user could attach a transaction to another user's
+      // private category id.
+      if (categoryId) {
+        const [category] = await db
+          .select({ id: categories.id })
+          .from(categories)
+          .where(
+            and(
+              eq(categories.id, categoryId),
+              or(isNull(categories.userId), eq(categories.userId, request.user.id)),
+            ),
+          )
+          .limit(1);
+        if (!category) {
+          return reply
+            .status(404)
+            .send({ error: "not_found", message: "Category not found", field: "categoryId" });
+        }
+      }
+
       const amountStr = amount.toFixed(2);
 
       const [tx] = await db
@@ -166,6 +187,24 @@ export async function transactionRoutes(app: FastifyInstance): Promise<void> {
       }
       if (existing.userId !== request.user.id) {
         return reply.status(403).send({ error: "forbidden", message: "Access denied" });
+      }
+
+      if (body.categoryId) {
+        const [category] = await db
+          .select({ id: categories.id })
+          .from(categories)
+          .where(
+            and(
+              eq(categories.id, body.categoryId),
+              or(isNull(categories.userId), eq(categories.userId, request.user.id)),
+            ),
+          )
+          .limit(1);
+        if (!category) {
+          return reply
+            .status(404)
+            .send({ error: "not_found", message: "Category not found", field: "categoryId" });
+        }
       }
 
       const updates: {

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { db, budgets, transactions, categories } from "@budgetapp/db";
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { authenticate } from "../middleware/authenticate.js";
 
 type BudgetPeriod = "monthly" | "weekly";
@@ -87,6 +87,26 @@ export async function budgetRoutes(app: FastifyInstance): Promise<void> {
     },
     handler: async (request, reply) => {
       const { categoryId, period, limitAmount, startDate } = request.body;
+
+      // Category must belong to this user or be a shared/global category
+      // (userId IS NULL) — otherwise a user could link a budget to another
+      // user's private category and leak its name/color/icon via GET /budgets.
+      const [category] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.id, categoryId),
+            or(isNull(categories.userId), eq(categories.userId, request.user.id)),
+          ),
+        )
+        .limit(1);
+
+      if (!category) {
+        return reply
+          .status(404)
+          .send({ error: "not_found", message: "Category not found", field: "categoryId" });
+      }
 
       const [budget] = await db
         .insert(budgets)
