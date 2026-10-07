@@ -602,9 +602,9 @@ export function IncomePage({ onLogout, onNavigate }: Props) {
 const styles: Record<string, React.CSSProperties> = {
   page: { minHeight: "100vh", background: "var(--bg-page)", fontFamily: "system-ui, sans-serif" },
   main: { maxWidth: "1200px", margin: "0 auto", padding: "2rem 1.5rem" },
-  toolbar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" },
+  toolbar: { display: "flex", flexWrap: "wrap" as const, rowGap: "0.75rem", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" },
   pageTitle: { margin: 0, fontSize: "1.4rem", fontWeight: 700, color: "var(--text-primary)" },
-  toolbarRight: { display: "flex", alignItems: "center", gap: "0.75rem" },
+  toolbarRight: { display: "flex", flexWrap: "wrap" as const, alignItems: "center", gap: "0.75rem" },
   addBtn: {
     background: "#16a34a", color: "#fff", border: "none",
     padding: "0.5rem 1.25rem", borderRadius: "8px", cursor: "pointer", fontSize: "0.9rem", fontWeight: 600,

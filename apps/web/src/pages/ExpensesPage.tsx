@@ -378,6 +378,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toolbar: {
     display: "flex",
+    flexWrap: "wrap" as const,
+    rowGap: "0.75rem",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "1.5rem",
@@ -556,6 +558,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toolbarRight: {
     display: "flex",
+    flexWrap: "wrap" as const,
     alignItems: "center",
     gap: "0.75rem",
   },

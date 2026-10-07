@@ -419,7 +419,7 @@ export function NetWorthPage({ onLogout, onNavigate }: Props) {
 const styles: Record<string, React.CSSProperties> = {
   page: { minHeight: "100vh", background: "var(--bg-page)", fontFamily: "system-ui, sans-serif" },
   main: { maxWidth: "1100px", margin: "0 auto", padding: "2rem 1.5rem" },
-  toolbar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" },
+  toolbar: { display: "flex", flexWrap: "wrap" as const, rowGap: "0.75rem", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" },
   pageTitle: { margin: 0, fontSize: "1.4rem", fontWeight: 700, color: "var(--text-primary)" },
   monthPicker: { display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", fontWeight: 500, color: "var(--text-secondary)" },
   monthInput: {
